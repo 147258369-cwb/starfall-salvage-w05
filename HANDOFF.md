@@ -3,6 +3,7 @@
 > 交接时间：2026-10-29 21:xx（HKT）  
 > 最新功能提交：2d7e1d6（奶蛙外观重做）；交接文档提交见最新 git log  
 > 远程：https://github.com/147258369-cwb/starfall-salvage-w05.git  
+> 推送状态：**已 push 到 origin/main**（2026-10-29，最新提交 ae8561f；git status -sb 显示 up-to-date）  
 > 接手人请先读本文件，再读 README.md；提交作业前必读 W05_GroupID.md。
 
 ---
@@ -27,7 +28,7 @@
 | 贴图 | ✅ 纯 Canvas 程序化 6 区域墙/地/顶 + 海报/标牌/奶蛙 Jumpscare 脸 |
 | 报告 | ⚠️ 骨架已写，NO AI 段落全部是 TODO，必须组员本人填 |
 | 视频 | ❌ 尚未录制（≤5:00，需真人游玩 + Demo + 反馈/迭代证据） |
-| Git | 最新功能 commit 2d7e1d6；交接文档会再产生一个 commit；按需求 push 到 origin/main |
+| Git | 最新功能 commit 2d7e1d6；交接文档提交 ae8561f；已 push 到 origin/main，工作树干净 |
 
 ---
 
@@ -180,7 +181,7 @@ python tools/package_submission.py
 - node_modules/、release/、tools/qa/out/、tools/shots/ 都被 .gitignore 忽略，不要强行提交。
 - 改动 src/textures.js 后要同时看 tools/texture-preview.html；贴图缓存共享 repeat，需要不同平铺时 clone。
 - 改动 assets/audio/manifest.json 后，音频键名必须和 src/audio.js / src/story.js 对应。
-- Git 远程：https://github.com/147258369-cwb/starfall-salvage-w05.git ；本次交接会 push main，push 后以 git status -sb 是否显示 up-to-date 为准。
+- Git 远程：https://github.com/147258369-cwb/starfall-salvage-w05.git ；本次交接已 push main（ae8561f），后续以 git status -sb 是否显示 up-to-date 为准。
 
 ---
 
