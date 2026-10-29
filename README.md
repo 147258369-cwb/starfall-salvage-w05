@@ -2,6 +2,7 @@
 **Milk Frog Park: Midnight Milk Candy**
 
 > 一款第一人称、温馨又惊悚的 3D 迷宫游戏。  
+> **接手/交接：先看 [HANDOFF.md](HANDOFF.md)。**  
 > 在废弃的奶蛙乐园里收集八片奶片，带着它们从安全出口离开——别停下，它们还记得你的味道。
 
 > **一句话目标：** 在乐园被推平的前夜回到废弃的「奶蛙乐园」迷宫，找到并带走 8 片奶片，躲开一直跟着你的奶蛙，从安全出口活着离开。
@@ -139,7 +140,8 @@ Demo 使用与真人游玩完全相同的场景、HUD、AI、声音与胜负逻�
 │  ├─ package_submission.py # 生成 release/w05_3d_game/ 提交包
 │  └─ qa/*.mjs           # Playwright 自动化验收脚本
 ├─ release/              # 打包产物（运行 `python tools/package_submission.py` 生成）
-└─ W05_GroupID.md        # 小组作业报告（含待人工填写项）
+├─ W05_GroupID.md        # 小组作业报告（含待人工填写项）
+└─ HANDOFF.md            # 交接文档（接手人先读）
 ```
 
 ---
