@@ -1,0 +1,435 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>奶蛙乐园 · 程序化贴图预览</title>
+<link rel="icon" href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/p9sAAAAASUVORK5CYII=">
+<style>
+  html, body { margin: 0; height: 100%; background: #07060a; overflow: hidden; }
+  canvas { display: block; }
+  #hud {
+    position: fixed; right: 18px; top: 14px; z-index: 10; text-align: right;
+    font: 12px/1.6 "Microsoft YaHei", system-ui, sans-serif;
+    color: #8a8177; letter-spacing: 0.04em; pointer-events: none;
+    text-shadow: 0 1px 6px #000;
+  }
+  #hud b { color: #d8cdb9; font-weight: 600; letter-spacing: 0.12em; }
+  #hud code { color: #b7a888; font-family: Consolas, monospace; }
+  #tag {
+    position: fixed; right: 18px; bottom: 14px; z-index: 10;
+    font: 11px/1.6 "Microsoft YaHei", system-ui, sans-serif;
+    color: #5f5a52; letter-spacing: 0.1em; pointer-events: none;
+  }
+</style>
+<script type="importmap">
+  { "imports": { "three": "../vendor/three.module.js" } }
+</script>
+</head>
+<body>
+<div id="hud"><b>奶蛙乐园：午夜奶片</b> · 程序化贴图预览<br><code>#zones #posters #signs #frog</code><br><code>#p=rules #zone=entry #tex=wall:nap</code></div>
+<div id="tag">CANVAS 2D · 无外部图片 · 平铺纹理以 2×2 显示</div>
+<script type="module">
+import * as THREE from 'three';
+import { ZONES, createTextures } from '../src/textures.js';
+
+const T = createTextures();
+
+/* ---------------- 基础渲染 ---------------- */
+const scene = new THREE.Scene();
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+document.body.appendChild(renderer.domElement);
+
+const camera = new THREE.OrthographicCamera(-10, 10, 10, -10, 0.1, 200);
+
+/* 背景：暗色渐晕 */
+function gradientTexture() {
+  const c = document.createElement('canvas');
+  c.width = 512; c.height = 512;
+  const g = c.getContext('2d');
+  const grad = g.createRadialGradient(256, 220, 40, 256, 256, 360);
+  grad.addColorStop(0, '#17131a');
+  grad.addColorStop(0.55, '#0e0c11');
+  grad.addColorStop(1, '#050406');
+  g.fillStyle = grad;
+  g.fillRect(0, 0, 512, 512);
+  const t = new THREE.CanvasTexture(c);
+  t.colorSpace = THREE.SRGBColorSpace;
+  t.minFilter = THREE.LinearFilter;
+  return t;
+}
+const bgMesh = new THREE.Mesh(
+  new THREE.PlaneGeometry(160, 160),
+  new THREE.MeshBasicMaterial({ map: gradientTexture() })
+);
+bgMesh.position.z = -30;
+scene.add(bgMesh);
+
+/* 球体用的灯光 */
+scene.add(new THREE.HemisphereLight(0xfff0d0, 0x201c28, 2.0));
+const keyLight = new THREE.DirectionalLight(0xffe0b0, 2.6);
+keyLight.position.set(-5, 6, 9);
+scene.add(keyLight);
+const rimLight = new THREE.DirectionalLight(0x9fd8c0, 1.5);
+rimLight.position.set(6, -3, 6);
+scene.add(rimLight);
+const fillLight = new THREE.PointLight(0xffd9a0, 26, 40, 2);
+fillLight.position.set(-6, -23, 9);
+scene.add(fillLight);
+
+const PLANE = new THREE.PlaneGeometry(1, 1);
+const frameMat = new THREE.MeshBasicMaterial({ color: 0x241f28 });
+
+/* ---------------- 文字标签 ---------------- */
+function paintText(ctx, str, x, y, o) {
+  const opt = o || {};
+  ctx.save();
+  ctx.font = opt.font || '40px "Microsoft YaHei", sans-serif';
+  ctx.fillStyle = opt.color || '#e8e0d2';
+  ctx.textBaseline = 'middle';
+  ctx.globalAlpha = opt.alpha == null ? 1 : opt.alpha;
+  const spacing = opt.spacing || 0;
+  const align = opt.align || 'center';
+  if (!spacing) {
+    ctx.textAlign = align;
+    ctx.fillText(str, x, y);
+  } else {
+    const chars = Array.from(str);
+    const widths = chars.map((ch) => ctx.measureText(ch).width);
+    let total = 0;
+    for (let i = 0; i < widths.length; i++) total += widths[i];
+    total += spacing * Math.max(0, chars.length - 1);
+    let cx = align === 'center' ? x - total / 2 : align === 'right' ? x - total : x;
+    ctx.textAlign = 'left';
+    for (let i = 0; i < chars.length; i++) {
+      ctx.fillText(chars[i], cx, y);
+      cx += widths[i] + spacing;
+    }
+  }
+  ctx.restore();
+}
+
+function roundRect(ctx, x, y, w, h, r) {
+  const rr = Math.min(r, w / 2, h / 2);
+  ctx.beginPath();
+  ctx.moveTo(x + rr, y);
+  ctx.lineTo(x + w - rr, y);
+  ctx.quadraticCurveTo(x + w, y, x + w, y + rr);
+  ctx.lineTo(x + w, y + h - rr);
+  ctx.quadraticCurveTo(x + w, y + h, x + w - rr, y + h);
+  ctx.lineTo(x + rr, y + h);
+  ctx.quadraticCurveTo(x, y + h, x, y + h - rr);
+  ctx.lineTo(x, y + rr);
+  ctx.quadraticCurveTo(x, y, x + rr, y);
+  ctx.closePath();
+}
+
+function textTexture(w, h, paint) {
+  const c = document.createElement('canvas');
+  c.width = w; c.height = h;
+  const ctx = c.getContext('2d');
+  paint(ctx, w, h);
+  const t = new THREE.CanvasTexture(c);
+  t.colorSpace = THREE.SRGBColorSpace;
+  t.anisotropy = 4;
+  t.minFilter = THREE.LinearFilter;
+  t.magFilter = THREE.LinearFilter;
+  t.generateMipmaps = false;
+  return t;
+}
+
+const labelMat = new THREE.MeshBasicMaterial({ transparent: true, depthWrite: false });
+function addLabel(tex, worldW, x, y) {
+  const m = labelMat.clone();
+  m.map = tex;
+  const mesh = new THREE.Mesh(PLANE, m);
+  const hh = worldW * (tex.image.height / tex.image.width);
+  mesh.scale.set(worldW, hh, 1);
+  mesh.position.set(x, y, 0.02);
+  scene.add(mesh);
+  return mesh;
+}
+
+/* ---------------- 区域数据 ---------------- */
+const ZONE_INFO = {
+  entry:     { cn: '门厅',   en: 'ENTRY',     desc: '奶油黄壁纸 · 粉色小蛙',   color: '#ffd9a0' },
+  classroom: { cn: '教室',   en: 'CLASSROOM', desc: '薄荷绿墙 · 蜡笔涂鸦',     color: '#a9d6c4' },
+  nap:       { cn: '午睡室', en: 'NAP ROOM',  desc: '灰蓝星星 · 褪色阴冷',     color: '#8fa2b8' },
+  canteen:   { cn: '食堂',   en: 'CANTEEN',   desc: '粉墙彩旗 · 糖纸与油渍',   color: '#f7b6c2' },
+  corridor:  { cn: '走廊',   en: 'CORRIDOR',  desc: '奶黄瓷砖 · 深绿墙裙',     color: '#9aa98b' },
+  exit:      { cn: '出口区', en: 'EXIT',      desc: '水泥 · 绿色应急漆',       color: '#6f9a7c' },
+};
+
+const POSTER_INFO = {
+  frog:     { cn: '奶蛙贴纸',   en: 'FROG STICKER',  size: [512, 512] },
+  birthday: { cn: '生日会海报', en: 'BIRTHDAY 1999', size: [512, 768] },
+  rules:    { cn: '游园规则',   en: 'PARK RULES',    size: [512, 768] },
+  drawing:  { cn: '儿童蜡笔画', en: 'CRAYON PIECE',  size: [512, 768] },
+  missing:  { cn: '寻人启事',   en: 'MISSING',       size: [512, 768] },
+  map:      { cn: '乐园平面图', en: 'FLOOR PLAN',    size: [512, 768] },
+  menu:     { cn: '主菜单插画', en: 'MAIN MENU',     size: [512, 768] },
+};
+
+/* ---------------- 版式 ---------------- */
+const posterRects = {};
+const zoneRects = {};
+const sampleRects = {};
+
+function titleBlock() {
+  const tex = textTexture(1600, 240, (ctx) => {
+    paintText(ctx, '奶蛙乐园：午夜奶片', 6, 84, { font: '800 92px "Source Han Serif SC","Noto Serif SC","SimSun",serif', color: '#efe3c9', align: 'left', spacing: 4 });
+    paintText(ctx, 'PROCEDURAL TEXTURE SHEET · 2026 · 512px 程序化贴图 / 6 ZONES / 7 POSTERS', 10, 168, { font: '400 26px "Microsoft YaHei",sans-serif', color: '#8f867a', align: 'left', spacing: 2 });
+  });
+  addLabel(tex, 17.5, -15.0 + 17.5 / 2, 0.35);
+}
+
+function sectionLabel(code, cn, en, x, y) {
+  const tex = textTexture(1600, 120, (ctx) => {
+    paintText(ctx, code, 0, 56, { font: '800 54px "Microsoft YaHei",sans-serif', color: '#c9a86a', align: 'left', spacing: 2 });
+    paintText(ctx, '  ' + cn, 92, 56, { font: '700 40px "Microsoft YaHei",sans-serif', color: '#e6ddcd', align: 'left', spacing: 2 });
+    paintText(ctx, '  / ' + en, 92 + 40 * cn.length + 24, 58, { font: '400 24px "Microsoft YaHei",sans-serif', color: '#7d756a', align: 'left', spacing: 3 });
+    ctx.fillStyle = 'rgba(255,255,255,0.12)';
+    ctx.fillRect(0, 94, 1600, 1.5);
+  });
+  addLabel(tex, 16, x + 8, y);
+}
+
+function zoneLabel(zone) {
+  const info = ZONE_INFO[zone];
+  return textTexture(512, 420, (ctx) => {
+    ctx.clearRect(0, 0, 512, 420);
+    ctx.fillStyle = 'rgba(255,255,255,0.045)';
+    roundRect(ctx, 6, 6, 500, 408, 18);
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(255,255,255,0.10)';
+    ctx.lineWidth = 1.5;
+    roundRect(ctx, 6, 6, 500, 408, 18);
+    ctx.stroke();
+    ctx.fillStyle = info.color;
+    roundRect(ctx, 34, 74, 9, 268, 4.5);
+    ctx.fill();
+    paintText(ctx, info.cn, 70, 148, { font: '800 94px "Microsoft YaHei",sans-serif', color: '#f0e7d7', align: 'left', spacing: 4 });
+    paintText(ctx, info.en, 72, 226, { font: '600 28px "Microsoft YaHei",sans-serif', color: '#9b9285', align: 'left', spacing: 7 });
+    ctx.fillStyle = 'rgba(255,255,255,0.12)';
+    ctx.fillRect(72, 258, 340, 1.5);
+    paintText(ctx, info.desc, 72, 300, { font: '400 24px "Microsoft YaHei",sans-serif', color: '#b6ab9c', align: 'left' });
+    paintText(ctx, '512 × 512 · 可平铺 2×2', 72, 352, { font: '400 19px "Microsoft YaHei",sans-serif', color: '#6d655b', align: 'left', spacing: 1 });
+  });
+}
+
+function subLabel(text) {
+  return textTexture(512, 96, (ctx) => {
+    paintText(ctx, text, 256, 52, { font: '400 34px "Microsoft YaHei",sans-serif', color: '#a89d8e', spacing: 3 });
+  });
+}
+
+function posterLabel(kind) {
+  const info = POSTER_INFO[kind];
+  return textTexture(512, 150, (ctx) => {
+    paintText(ctx, info.cn, 256, 52, { font: '700 40px "Microsoft YaHei",sans-serif', color: '#e8dfd0', spacing: 2 });
+    paintText(ctx, info.en, 256, 102, { font: '400 22px "Microsoft YaHei",sans-serif', color: '#857c70', spacing: 3 });
+  });
+}
+
+function signLabel(text, en) {
+  return textTexture(512, 110, (ctx) => {
+    paintText(ctx, text, 256, 40, { font: '700 34px "Microsoft YaHei",sans-serif', color: '#cfc5b5', spacing: 2 });
+    paintText(ctx, en, 256, 78, { font: '400 20px "Microsoft YaHei",sans-serif', color: '#7c7468', spacing: 3 });
+  });
+}
+
+function addSample(tex, w, h, x, y, repeat, key) {
+  if (repeat) {
+    tex.repeat.set(repeat[0], repeat[1]);
+    tex.needsUpdate = true;
+  }
+  const frame = new THREE.Mesh(PLANE, frameMat);
+  frame.scale.set(w + 0.12, h + 0.12, 1);
+  frame.position.set(x, y, -0.01);
+  scene.add(frame);
+  const mesh = new THREE.Mesh(PLANE, new THREE.MeshBasicMaterial({ map: tex }));
+  mesh.scale.set(w, h, 1);
+  mesh.position.set(x, y, 0);
+  scene.add(mesh);
+  if (key) sampleRects[key] = { left: x - w / 2, right: x + w / 2, top: y + h / 2, bottom: y - h / 2 };
+  return mesh;
+}
+
+/* ---------------- 布局 ---------------- */
+const ZONE_ROWS = [-4.15, -8.5, -12.85];
+const SURFACE_LABELS = ['墙纸  WALL', '地面  FLOOR', '天花  CEILING', '墙裙  TRIM'];
+
+titleBlock();
+sectionLabel('A', '六区域表面', 'ZONE SURFACES ×24', -15.0, -1.75);
+
+for (let i = 0; i < ZONES.length; i++) {
+  const zone = ZONES[i];
+  const col = i % 2;
+  const row = Math.floor(i / 2);
+  const cx = col === 0 ? -7.8 : 7.8;
+  const cy = ZONE_ROWS[row];
+  zoneRects[zone] = { left: cx - 7.4, right: cx + 6.6, top: cy + 1.9, bottom: cy - 1.6 };
+
+  addLabel(zoneLabel(zone), 3.15, cx - 5.55, cy + 0.2);
+
+  const wallTex = T.wallpaper(zone);
+  const floorTex = T.floor(zone);
+  const ceilTex = T.ceiling(zone);
+  const trimTex = T.trim(zone);
+
+  const size = 2.4;
+  const y0 = cy + 0.45;
+  addSample(wallTex, size, size, cx - 2.45, y0, [2, 2], 'wall:' + zone);
+  addSample(floorTex, size, size, cx + 0.15, y0, [2, 2], 'floor:' + zone);
+  addSample(ceilTex, size, size, cx + 2.75, y0, [2, 2], 'ceiling:' + zone);
+  addSample(trimTex, size, size * 0.25, cx + 5.25, y0, [2, 1], 'trim:' + zone);
+
+  const xs = [cx - 2.45, cx + 0.15, cx + 2.75, cx + 5.25];
+  for (let k = 0; k < 4; k++) {
+    addLabel(subLabel(SURFACE_LABELS[k]), 2.0, xs[k], cy - 0.98);
+  }
+}
+
+sectionLabel('B', '海报与告示', 'POSTERS ×7', -15.0, -14.55);
+
+const posterOrder = ['frog', 'birthday', 'rules', 'drawing', 'missing', 'map', 'menu'];
+for (let i = 0; i < posterOrder.length; i++) {
+  const kind = posterOrder[i];
+  const info = POSTER_INFO[kind];
+  const pw = 2.6;
+  const ph = pw * (info.size[1] / info.size[0]);
+  const x = -9.75 + i * 3.25;
+  const y = -17.15;
+  addSample(T.poster(kind), pw, ph, x, y, null, 'poster:' + kind);
+  addLabel(posterLabel(kind), 2.45, x, -19.55);
+  posterRects[kind] = { left: x - pw / 2, right: x + pw / 2, top: y + ph / 2, bottom: y - ph / 2 };
+}
+
+sectionLabel('C', '中文标牌', 'SIGNS · SIGN() API', -15.0, -20.35);
+
+const signSpecs = [
+  { text: '教室', opts: { sub: 'CLASSROOM' }, cn: '教室', en: 'WOOD PLAQUE' },
+  { text: '安全出口', opts: {}, cn: '安全出口', en: 'GLOWING EXIT SIGN' },
+  { text: '奶蛙乐园', opts: { sub: 'MILK FROG PARK' }, cn: '门头', en: 'ENTRANCE PLAQUE' },
+];
+for (let i = 0; i < signSpecs.length; i++) {
+  const spec = signSpecs[i];
+  const tex = T.sign(spec.text, spec.opts);
+  const sw = 5.2;
+  const sh = sw * (tex.image.height / tex.image.width);
+  const x = -6.6 + i * 6.6;
+  addSample(tex, sw, sh, x, -21.75, null);
+  addLabel(signLabel(spec.cn, spec.en), 3.0, x, -22.9);
+}
+
+sectionLabel('D', '奶蛙正脸与光斑', 'FROGFACE · GLOW', -15.0, -23.7);
+
+/* 球体贴脸 */
+const sphereTex = T.frogFace();
+const sphere = new THREE.Mesh(
+  new THREE.SphereGeometry(1.5, 64, 48),
+  new THREE.MeshStandardMaterial({ map: sphereTex, roughness: 0.5, metalness: 0.02 })
+);
+sphere.position.set(-6.2, -25.65, 0);
+sphere.rotation.y = -Math.PI / 2;
+scene.add(sphere);
+addLabel(subLabel('FROGFACE 贴球体 · 512²'), 2.4, -6.2, -27.55);
+
+/* 正脸平面 */
+addSample(sphereTex, 3.0, 3.0, -1.0, -25.65, null, 'frogFace');
+addLabel(subLabel('FROGFACE 原图 · 512²'), 2.4, -1.0, -27.55);
+
+/* 光斑 */
+const glowTex = T.glow();
+const glowMat = new THREE.MeshBasicMaterial({
+  map: glowTex,
+  transparent: true,
+  blending: THREE.AdditiveBlending,
+  depthWrite: false,
+});
+const glowMesh = new THREE.Mesh(PLANE, glowMat);
+glowMesh.scale.set(3.2, 3.2, 1);
+glowMesh.position.set(3.6, -25.65, 0);
+scene.add(glowMesh);
+addLabel(subLabel('GLOW · 白色径向渐变'), 2.4, 3.6, -27.55);
+sampleRects.glow = { left: 2.0, right: 5.2, top: -24.05, bottom: -27.25 };
+
+/* 页脚 */
+const footerTex = textTexture(1600, 90, (ctx) => {
+  paintText(ctx, '全部纹理由 canvas 2D 程序化生成 · 无外部图片 · 平铺纹理边缘已做 wrap-aware 处理 · 色值遵循 docs/CONTRACT.md 视觉基调', 800, 46, { font: '400 22px "Microsoft YaHei",sans-serif', color: '#6d655b', spacing: 0.5 });
+});
+addLabel(footerTex, 15.5, 0, -28.55);
+
+/* ---------------- 相机取景 ---------------- */
+const SECTION_BOUNDS = {
+  all:     { left: -15.6, right: 14.9, top: 1.5, bottom: -28.9 },
+  zones:   { left: -15.4, right: 14.6, top: -1.1, bottom: -14.4 },
+  posters: { left: -13.0, right: 13.0, top: -14.2, bottom: -20.2 },
+  signs:   { left: -9.6, right: 9.6, top: -20.0, bottom: -23.4 },
+  frog:    { left: -9.2, right: 9.2, top: -23.3, bottom: -28.2 },
+};
+
+function fit(b) {
+  const aspect = window.innerWidth / window.innerHeight;
+  const pad = 0.3;
+  const cw = b.right - b.left + pad * 2;
+  const ch = b.top - b.bottom + pad * 2;
+  let vw = cw;
+  let vh = ch;
+  if (cw / ch < aspect) vw = ch * aspect;
+  else vh = cw / aspect;
+  camera.left = -vw / 2;
+  camera.right = vw / 2;
+  camera.top = vh / 2;
+  camera.bottom = -vh / 2;
+  const cx = (b.left + b.right) / 2;
+  const cy = (b.top + b.bottom) / 2;
+  camera.position.set(cx, cy, 30);
+  camera.lookAt(cx, cy, 0);
+  camera.updateProjectionMatrix();
+}
+
+function currentBounds() {
+  const hash = decodeURIComponent((location.hash || '#all').slice(1));
+  if (hash.indexOf('p=') === 0) {
+    const r = posterRects[hash.slice(2)];
+    if (r) return { left: r.left, right: r.right, top: r.top, bottom: r.bottom };
+  }
+  if (hash.indexOf('zone=') === 0) {
+    const r = zoneRects[hash.slice(5)];
+    if (r) return r;
+  }
+  if (hash.indexOf('tex=') === 0) {
+    const r = sampleRects[hash.slice(4)];
+    if (r) return r;
+  }
+  return SECTION_BOUNDS[hash] || SECTION_BOUNDS.all;
+}
+
+function resize() {
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  fit(currentBounds());
+  renderer.render(scene, camera);
+}
+window.addEventListener('resize', resize);
+window.addEventListener('hashchange', resize);
+
+resize();
+renderer.render(scene, camera);
+
+/* 静态场景，偶尔重绘一次防止上下文恢复后空白 */
+let frames = 0;
+function loop() {
+  if (frames < 8) {
+    renderer.render(scene, camera);
+    frames++;
+  }
+  requestAnimationFrame(loop);
+}
+requestAnimationFrame(loop);
+</script>
+</body>
+</html>

@@ -1,0 +1,7 @@
+node_modules/
+release/
+tools/qa/out/
+tools/shots/
+*.log
+.DS_Store
+Thumbs.db

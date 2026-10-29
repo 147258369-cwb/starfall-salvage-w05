@@ -1,0 +1,231 @@
+{
+  "generated": "2026-10-29",
+  "generator": "tools/gen_audio.py",
+  "tracks": {
+    "music_menu": {
+      "file": "assets/audio/music_menu.wav",
+      "kind": "music",
+      "loop": true,
+      "gain": 0.55,
+      "duration": 28.52,
+      "desc": "主菜单循环：A 小调音乐盒摇篮曲，整体音准偏低 26 音分，磁带抖晃，第 6 小节藏了一个半音错音，底下 55Hz 嗡鸣"
+    },
+    "music_story": {
+      "file": "assets/audio/music_story.wav",
+      "kind": "music",
+      "loop": true,
+      "gain": 0.5,
+      "duration": 29.94,
+      "desc": "片头剧情循环：更暗的低频 drone + 稀疏的音乐盒单音与远处铁皮敲击"
+    },
+    "amb_game": {
+      "file": "assets/audio/amb_game.wav",
+      "kind": "ambience",
+      "loop": true,
+      "gain": 0.42,
+      "duration": 23.5,
+      "desc": "游玩环境循环：室内底噪、日光灯电流、远处水滴与门轴吱嘎、几乎听不清的音乐盒残片"
+    },
+    "heartbeat": {
+      "file": "assets/audio/heartbeat.wav",
+      "kind": "ambience",
+      "loop": true,
+      "gain": 0.72,
+      "duration": 1.57,
+      "desc": "心跳循环 1.6s：lub-dub 双拍，奶蛙靠近时引擎提高音量"
+    },
+    "vo_01": {
+      "file": "assets/audio/vo_01.wav",
+      "kind": "voice",
+      "loop": false,
+      "gain": 0.95,
+      "duration": 4.33,
+      "desc": "旁白：开场/1999 年最后一场生日会",
+      "text": "1999年，奶蛙乐园举办最后一场生日会。"
+    },
+    "vo_02": {
+      "file": "assets/audio/vo_02.wav",
+      "kind": "voice",
+      "loop": false,
+      "gain": 0.95,
+      "duration": 3.5,
+      "desc": "旁白：老师与奶片的规则",
+      "text": "老师说：吃了奶片，就能变成奶龙。"
+    },
+    "vo_03": {
+      "file": "assets/audio/vo_03.wav",
+      "kind": "voice",
+      "loop": false,
+      "gain": 0.95,
+      "duration": 5.06,
+      "desc": "旁白：孩子们吃了，你把八片藏了起来",
+      "text": "所有孩子都吃了。只有你，把八片奶片藏了起来。"
+    },
+    "vo_04": {
+      "file": "assets/audio/vo_04.wav",
+      "kind": "voice",
+      "loop": false,
+      "gain": 0.95,
+      "duration": 5.73,
+      "desc": "旁白：第二天，乐园空了，只剩那首歌",
+      "text": "第二天，乐园空了。只剩那首歌——我是奶龙，我才是奶龙。"
+    },
+    "vo_05": {
+      "file": "assets/audio/vo_05.wav",
+      "kind": "voice",
+      "loop": false,
+      "gain": 0.95,
+      "duration": 4.07,
+      "desc": "旁白：推土机明天就来，回来取奶片",
+      "text": "推土机明天就来。你回来取走奶片。"
+    },
+    "frog_voice_1": {
+      "file": "assets/audio/frog_voice_1.wav",
+      "kind": "voice",
+      "loop": true,
+      "gain": 0.55,
+      "duration": 3.87,
+      "desc": "奶蛙叫声 1（正常变调，尖细塑料玩具感）",
+      "text": "我是奶龙！我才是奶龙！"
+    },
+    "frog_voice_2": {
+      "file": "assets/audio/frog_voice_2.wav",
+      "kind": "voice",
+      "loop": true,
+      "gain": 0.55,
+      "duration": 4.27,
+      "desc": "奶蛙叫声 2（慢速低吼，喉咙毛刺）",
+      "text": "奶……奶片……给我……"
+    },
+    "frog_voice_3": {
+      "file": "assets/audio/frog_voice_3.wav",
+      "kind": "voice",
+      "loop": true,
+      "gain": 0.52,
+      "duration": 3.97,
+      "desc": "奶蛙叫声 3（卡带鬼畜：切碎重复、掉帧、比特粉碎、随机倒放）",
+      "text": "龙……奶龙……都是奶龙……"
+    },
+    "frog_voice_4": {
+      "file": "assets/audio/frog_voice_4.wav",
+      "kind": "voice",
+      "loop": true,
+      "gain": 0.5,
+      "duration": 4.21,
+      "desc": "奶蛙叫声 4（耳语气声：滤掉低频，气声包络补足）",
+      "text": "嘘……别怕……留下来……"
+    },
+    "sfx_click": {
+      "file": "assets/audio/sfx_click.wav",
+      "kind": "sfx",
+      "loop": false,
+      "gain": 0.5,
+      "duration": 0.1,
+      "desc": "UI 点击：金属簧片 + 短促气声"
+    },
+    "sfx_ui_hover": {
+      "file": "assets/audio/sfx_ui_hover.wav",
+      "kind": "sfx",
+      "loop": false,
+      "gain": 0.32,
+      "duration": 0.07,
+      "desc": "菜单悬停：极短的高频气音"
+    },
+    "sfx_start_sting": {
+      "file": "assets/audio/sfx_start_sting.wav",
+      "kind": "sfx",
+      "loop": false,
+      "gain": 0.85,
+      "duration": 4.4,
+      "desc": "开始游戏的阴森音效：反向吸气 + 低频冲击 + 增四度音簇 + 长混响"
+    },
+    "sfx_pickup": {
+      "file": "assets/audio/sfx_pickup.wav",
+      "kind": "sfx",
+      "loop": false,
+      "gain": 0.68,
+      "duration": 1.15,
+      "desc": "拾取奶片：清脆铃铛，可叠音"
+    },
+    "sfx_unlock_map": {
+      "file": "assets/audio/sfx_unlock_map.wav",
+      "kind": "sfx",
+      "loop": false,
+      "gain": 0.7,
+      "duration": 2.6,
+      "desc": "解锁地图：温暖大三和弦铺开，1.35s 处插入一个不和谐音"
+    },
+    "sfx_unlock_speed": {
+      "file": "assets/audio/sfx_unlock_speed.wav",
+      "kind": "sfx",
+      "loop": false,
+      "gain": 0.7,
+      "duration": 2.3,
+      "desc": "解锁加速：上升滑音 + 逐渐加快的滴答"
+    },
+    "sfx_exit_open": {
+      "file": "assets/audio/sfx_exit_open.wav",
+      "kind": "sfx",
+      "loop": false,
+      "gain": 0.8,
+      "duration": 3.0,
+      "desc": "出口开启：门闩金属声、锁体松动、门缝灌风、木头吱嘎"
+    },
+    "sfx_win": {
+      "file": "assets/audio/sfx_win.wav",
+      "kind": "sfx",
+      "loop": false,
+      "gain": 0.85,
+      "duration": 7.0,
+      "desc": "通关：音乐盒上行收束，4s 后尾音被磁带拖慢走低，叠上低频 drone"
+    },
+    "sfx_lose": {
+      "file": "assets/audio/sfx_lose.wav",
+      "kind": "sfx",
+      "loop": false,
+      "gain": 0.9,
+      "duration": 5.0,
+      "desc": "被抓：低频下坠 + FM 尖啸 + 残余呼吸"
+    },
+    "sfx_screech": {
+      "file": "assets/audio/sfx_screech.wav",
+      "kind": "sfx",
+      "loop": false,
+      "gain": 0.78,
+      "duration": 2.0,
+      "desc": "奶蛙贴脸：高频金属尖啸，带快速颤动与气声"
+    },
+    "sfx_footstep_1": {
+      "file": "assets/audio/sfx_footstep_1.wav",
+      "kind": "sfx",
+      "loop": false,
+      "gain": 0.42,
+      "duration": 0.36,
+      "desc": "脚步 1：低频落地 + 木地板摩擦"
+    },
+    "sfx_footstep_2": {
+      "file": "assets/audio/sfx_footstep_2.wav",
+      "kind": "sfx",
+      "loop": false,
+      "gain": 0.42,
+      "duration": 0.36,
+      "desc": "脚步 2：低频落地 + 瓷砖/碎石摩擦"
+    },
+    "sfx_sprint": {
+      "file": "assets/audio/sfx_sprint.wav",
+      "kind": "sfx",
+      "loop": false,
+      "gain": 0.6,
+      "duration": 0.9,
+      "desc": "加速起跑：风声掠过 + 两步急促脚步"
+    },
+    "sfx_frog_alert": {
+      "file": "assets/audio/sfx_frog_alert.wav",
+      "kind": "sfx",
+      "loop": false,
+      "gain": 0.75,
+      "duration": 1.2,
+      "desc": "奶蛙发现玩家：喉咙咕噜，音高先升后落"
+    }
+  }
+}

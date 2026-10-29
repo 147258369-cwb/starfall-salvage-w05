@@ -1,14 +1,223 @@
 <!doctype html>
-<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Starfall Salvage — 3D Game</title>
-<style>
-:root{color-scheme:dark;font-family:system-ui,Segoe UI,sans-serif;background:#07111f;color:#e9f4ff}*{box-sizing:border-box}body{margin:0;overflow:hidden}canvas{display:block;width:100vw;height:100vh}#hud{position:fixed;inset:0;pointer-events:none;padding:20px;display:flex;justify-content:space-between;align-items:flex-start;text-shadow:0 2px 8px #000}#hud>div{background:#061324bb;border:1px solid #66dbff55;border-radius:14px;padding:12px 16px;backdrop-filter:blur(8px)}#help{position:fixed;bottom:18px;left:50%;transform:translateX(-50%);color:#c6dcf0;background:#061324bb;padding:9px 16px;border-radius:99px;font-size:14px}#menu{position:fixed;inset:0;display:grid;place-items:center;background:radial-gradient(ellipse at 50% 40%,#143c54aa,#040914dd);text-align:center}#panel{max-width:560px;padding:34px;background:#071727ed;border:1px solid #77ddff66;border-radius:24px;box-shadow:0 18px 80px #0009}h1{font-size:clamp(38px,7vw,68px);margin:0;color:#8cecff;letter-spacing:.04em}p{line-height:1.6;color:#ccdeee}button{pointer-events:auto;border:0;border-radius:12px;padding:13px 22px;margin:8px;background:#68dbff;color:#06121d;font-weight:800;font-size:16px;cursor:pointer}button.secondary{background:#17374e;color:#dff8ff;border:1px solid #67dfff66}.row{display:flex;justify-content:center;flex-wrap:wrap}.hidden{display:none!important}#mute{position:fixed;right:18px;bottom:18px}
-</style><script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js"}}</script></head><body>
-<div id="hud" class="hidden"><div>✦ SALVAGE <b id="score">0</b> / 6</div><div>HULL <b id="hull">3</b></div></div><div id="help" class="hidden">WASD / Arrow keys: steer · Collect 6 energy shards · Avoid asteroids</div><button id="mute" class="hidden secondary">🔊 Sound</button><div id="menu"><div id="panel"><h1>STARFALL<br>SALVAGE</h1><p>Recover six lost energy shards in a drifting asteroid field. Steer your little ship, dodge rocks, and make it home in one piece.</p><div class="row"><button id="start">START MISSION</button><button id="demo" class="secondary">WATCH DEMO</button></div><p style="font-size:13px">Demo runs the real game automatically. Press Esc to return.</p></div></div>
-<script type="module">
-import * as THREE from 'three';
-const scene=new THREE.Scene();scene.background=new THREE.Color(0x07111f);scene.fog=new THREE.FogExp2(0x07111f,.012);const camera=new THREE.PerspectiveCamera(62,innerWidth/innerHeight,.1,200);camera.position.set(0,8,15);camera.lookAt(0,0,0);const renderer=new THREE.WebGLRenderer({antialias:true});renderer.setPixelRatio(Math.min(devicePixelRatio,2));renderer.setSize(innerWidth,innerHeight);renderer.shadowMap.enabled=true;document.body.appendChild(renderer.domElement);scene.add(new THREE.HemisphereLight(0xb9eaff,0x101624,2));const sun=new THREE.DirectionalLight(0xffffff,3);sun.position.set(-5,12,7);sun.castShadow=true;scene.add(sun);const floor=new THREE.Mesh(new THREE.PlaneGeometry(100,100),new THREE.MeshStandardMaterial({color:0x0d2031,roughness:.95}));floor.rotation.x=-Math.PI/2;floor.position.y=-1.2;floor.receiveShadow=true;scene.add(floor);const grid=new THREE.GridHelper(100,50,0x185074,0x102a40);grid.position.y=-1.18;scene.add(grid);
-const ship=new THREE.Group();const hull=new THREE.Mesh(new THREE.ConeGeometry(.58,1.6,5),new THREE.MeshStandardMaterial({color:0x59dfff,metalness:.45,roughness:.3,emissive:0x06334a}));hull.rotation.x=Math.PI/2;hull.castShadow=true;ship.add(hull);const cockpit=new THREE.Mesh(new THREE.SphereGeometry(.23,16,12),new THREE.MeshStandardMaterial({color:0xe5ffff,emissive:0x55cfff,emissiveIntensity:1.7}));cockpit.position.set(0,.25,-.1);ship.add(cockpit);ship.position.set(0,0,5);scene.add(ship);const rand=(a,b)=>a+Math.random()*(b-a);const shards=[],rocks=[];for(let i=0;i<6;i++){const o=new THREE.Mesh(new THREE.OctahedronGeometry(.38,0),new THREE.MeshStandardMaterial({color:0xffd76a,emissive:0x9a4e00,emissiveIntensity:.7,metalness:.3}));o.position.set(rand(-8,8),rand(-.1,1.2),rand(-10,3));o.userData.base=o.position.y;o.castShadow=true;scene.add(o);shards.push(o)}for(let i=0;i<11;i++){const r=new THREE.Mesh(new THREE.DodecahedronGeometry(rand(.5,1.1),0),new THREE.MeshStandardMaterial({color:0x526071,roughness:1}));r.position.set(rand(-9,9),-.15,rand(-11,7));r.rotation.set(rand(0,3),rand(0,3),rand(0,3));r.castShadow=true;scene.add(r);rocks.push(r)}const stars=new THREE.Points(new THREE.BufferGeometry(),new THREE.PointsMaterial({color:0x9edfff,size:.075}));const arr=[];for(let i=0;i<700;i++)arr.push(rand(-50,50),rand(2,35),rand(-50,30));stars.geometry.setAttribute('position',new THREE.Float32BufferAttribute(arr,3));scene.add(stars);
-let running=false,demoMode=false,score=0,hp=3,muted=false,keys={},last=0,iframes=0,audio;function beep(freq=600,dur=.09,type='sine'){if(muted)return;try{audio??=new AudioContext();const o=audio.createOscillator(),g=audio.createGain();o.type=type;o.frequency.value=freq;g.gain.setValueAtTime(.08,audio.currentTime);g.gain.exponentialRampToValueAtTime(.001,audio.currentTime+dur);o.connect(g);g.connect(audio.destination);o.start();o.stop(audio.currentTime+dur)}catch{}}
-const menu=document.querySelector('#menu'),hud=document.querySelector('#hud'),help=document.querySelector('#help'),muteBtn=document.querySelector('#mute');function reset(demo=false){score=0;hp=3;demoMode=demo;ship.position.set(0,0,5);shards.forEach((s,i)=>{s.visible=true;s.position.set([-6,-3,0,3,6,1][i],.35,-7+Math.floor(i/3)*-3)});rocks.forEach((r,i)=>r.position.set([-8,-4,4,8,-7,7,-2,3,0,6,-6][i],-.15,[-3,-7,-5,-9,1,2,5,0,3,6,7][i]));running=true;menu.classList.add('hidden');hud.classList.remove('hidden');help.classList.remove('hidden');muteBtn.classList.remove('hidden');document.querySelector('#score').textContent='0';document.querySelector('#hull').textContent='3';beep(500,.14)}function finish(win){running=false;demoMode=false;menu.classList.remove('hidden');document.querySelector('#panel').innerHTML=`<h1>${win?'MISSION COMPLETE':'SHIP LOST'}</h1><p>${win?'All six shards recovered. A clean run through the field!':'The field was too rough this time.'} Final salvage: ${score}/6.</p><div class="row"><button id="again">PLAY AGAIN</button><button id="demoAgain" class="secondary">WATCH DEMO</button></div>`;document.querySelector('#again').onclick=()=>reset(false);document.querySelector('#demoAgain').onclick=()=>reset(true);hud.classList.add('hidden');help.classList.add('hidden');muteBtn.classList.add('hidden');beep(win?880:180,.4,'triangle')}document.querySelector('#start').onclick=()=>reset(false);document.querySelector('#demo').onclick=()=>reset(true);muteBtn.onclick=()=>{muted=!muted;muteBtn.textContent=muted?'🔇 Muted':'🔊 Sound';if(!muted)beep()};addEventListener('keydown',e=>{keys[e.key.toLowerCase()]=true;if(e.key==='Escape'&&running){running=false;menu.classList.remove('hidden');document.querySelector('#panel').innerHTML='<h1>MISSION PAUSED</h1><p>Ready when you are.</p><div class="row"><button id="resume">RESUME</button><button id="restart">RESTART</button><button id="demoAgain" class="secondary">WATCH DEMO</button></div>';document.querySelector('#resume').onclick=()=>{running=true;menu.classList.add('hidden')};document.querySelector('#restart').onclick=()=>reset(false);document.querySelector('#demoAgain').onclick=()=>reset(true)}});addEventListener('keyup',e=>keys[e.key.toLowerCase()]=false);
-function animate(t){requestAnimationFrame(animate);const dt=Math.min((t-last)/1000||0,.04);last=t;shards.forEach((s,i)=>{if(s.visible){s.rotation.y+=dt*1.7;s.rotation.x+=dt*.7;s.position.y=s.userData.base+Math.sin(t*.002+i)*.12}});rocks.forEach(r=>{r.rotation.x+=dt*.18;r.rotation.y+=dt*.24});if(running){let dx=0,dz=0;if(demoMode){dx=Math.sin(t*.0015)*.055;dz=Math.cos(t*.001)*.035;const target=shards.find(s=>s.visible);if(target){dx+=(target.position.x-ship.position.x)*.045;dz+=(target.position.z-ship.position.z)*.02}}else{if(keys.a||keys.arrowleft)dx=-1;if(keys.d||keys.arrowright)dx=1;if(keys.w||keys.arrowup)dz=-1;if(keys.s||keys.arrowdown)dz=1}ship.position.x=THREE.MathUtils.clamp(ship.position.x+dx*dt*(demoMode?18:8),-10,10);ship.position.z=THREE.MathUtils.clamp(ship.position.z+dz*dt*(demoMode?18:8),-12,8);ship.rotation.z=-dx*.22;for(const s of shards)if(s.visible&&ship.position.distanceTo(s.position)<.95){s.visible=false;score++;document.querySelector('#score').textContent=score;beep(760,.16,'triangle');if(score===6){finish(true);break}}if(running&&iframes>0)iframes-=dt;else if(running){const hit=rocks.find(r=>Math.hypot(r.position.x-ship.position.x,r.position.z-ship.position.z)<.85);if(hit){hp--;iframes=1.1;document.querySelector('#hull').textContent=hp;beep(130,.2,'sawtooth');if(hp<=0)finish(false)}}if(demoMode&&score>=6&&running)finish(true)}camera.position.x+=(ship.position.x*.22-camera.position.x)*.04;camera.position.z+=(ship.position.z+10-camera.position.z)*.025;camera.lookAt(ship.position.x*.25,0,ship.position.z-2);renderer.render(scene,camera)}requestAnimationFrame(animate);addEventListener('resize',()=>{camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight)});
-</script></body></html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>奶蛙乐园：午夜奶片 · Milk Frog Park</title>
+<meta name="description" content="第一人称温馨惊悚迷宫游戏：在废弃的奶蛙乐园里取回八片奶片，别被它们找到。" />
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' fill='%230b0809'/%3E%3Ccircle cx='32' cy='34' r='20' fill='%23d6d46c'/%3E%3Ccircle cx='24' cy='29' r='7' fill='%23f7f4e6'/%3E%3Ccircle cx='40' cy='29' r='7' fill='%23f7f4e6'/%3E%3Ccircle cx='24' cy='29' r='2.2' fill='%23111'/%3E%3Ccircle cx='40' cy='29' r='2.2' fill='%23111'/%3E%3Cpath d='M22 41 Q32 49 42 41' stroke='%2340151b' stroke-width='2.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E" />
+<link rel="stylesheet" href="./styles.css" />
+<script type="importmap">
+{ "imports": { "three": "./vendor/three.module.js" } }
+</script>
+</head>
+<body>
+<div id="scene" aria-hidden="true"></div>
+
+<div id="fx">
+  <div class="vignette"></div>
+  <div id="pickup-flash" class="pickup-flash"></div>
+  <div id="danger-tint"></div>
+  <div class="grain"></div>
+  <div class="scanlines"></div>
+</div>
+
+<!-- ========== HUD ========== -->
+<div id="hud" class="hidden">
+  <header class="hud-top">
+    <div class="objective-card">
+      <div class="hud-kicker">第 1 夜 · 奶蛙乐园</div>
+      <div class="hud-objective" id="objective-text">取回你的 8 片奶片</div>
+      <div class="candy-progress" id="candy-progress" aria-label="奶片进度"></div>
+    </div>
+    <div class="hud-top-right">
+      <span class="hud-hint-text">ESC 暂停 · M 静音</span>
+    </div>
+  </header>
+
+  <aside id="minimap-wrap" class="minimap-wrap hidden">
+    <div class="map-head"><span>乐园地图</span><em>1987 · F1</em></div>
+    <canvas id="minimap" width="260" height="196"></canvas>
+    <div class="map-legend"><i class="dot player"></i>你 <i class="dot frog"></i>奶蛙 <i class="dot exit"></i>出口</div>
+  </aside>
+
+  <div class="hud-bottom">
+    <div id="stamina-wrap" class="stamina-wrap hidden">
+      <span class="stamina-label">糖 分</span>
+      <div class="stamina-track"><div id="stamina-fill"></div></div>
+      <span class="stamina-key">SHIFT</span>
+    </div>
+    <div id="crosshair" aria-hidden="true"></div>
+    <div class="items" id="items">
+      <div class="item locked" id="item-map"><span class="item-icon">▤</span><span class="item-name">地图</span><span class="item-lock">未解锁</span></div>
+      <div class="item locked" id="item-speed"><span class="item-icon">ϟ</span><span class="item-name">加速</span><span class="item-lock">未解锁</span></div>
+    </div>
+  </div>
+
+  <div id="subtitles" class="subtitles" role="status" aria-live="polite">
+    <span class="sub-speaker" id="sub-speaker">奶蛙</span>
+    <span class="sub-text" id="sub-text"></span>
+  </div>
+  <div id="proximity-warning" class="proximity-warning hidden">它 就 在 你 身 后</div>
+  <div id="pointer-hint" class="pointer-hint hidden">点击画面锁定鼠标</div>
+  <div id="interact-prompt" class="interact-prompt hidden"></div>
+  <div id="toasts" class="toasts"></div>
+</div>
+
+<!-- ========== 主菜单 ========== -->
+<div id="menu" class="screen menu">
+  <div class="menu-shade"></div>
+  <div class="menu-grid">
+    <div class="menu-left">
+      <div class="menu-kicker"><span class="rule"></span>一个关于奶片与失去的夜晚<span class="rule"></span></div>
+      <h1 class="game-title" aria-label="奶蛙乐园">
+        <span class="title-cn">奶蛙乐园</span>
+        <span class="title-en">MILK FROG PARK</span>
+      </h1>
+      <div class="title-rule"><span></span><em>午夜奶片 · MIDNIGHT MILK CANDY</em><span></span></div>
+      <p class="tagline">吃了奶片，就能变成奶龙。</p>
+      <nav class="menu-actions">
+        <button id="btn-start" class="btn primary"><span>开始游戏</span><em>START</em></button>
+        <button id="btn-demo" class="btn"><span>演示模式</span><em>DEMO</em></button>
+        <button id="btn-help" class="btn ghost"><span>操作说明</span><em>HOW TO PLAY</em></button>
+      </nav>
+      <div class="menu-audio">
+        <button id="btn-mute" class="mute-btn" title="静音 (M)" aria-label="静音">♪</button>
+        <input id="volume" class="volume" type="range" min="0" max="100" value="70" aria-label="音量" />
+        <span class="audio-hint">建议佩戴耳机 · 含惊吓音效</span>
+      </div>
+    </div>
+    <div class="menu-right">
+      <div class="menu-quote">
+        <p>“我是奶龙！<br />我才是奶龙！”</p>
+        <span>—— 走廊，1999.06.01</span>
+      </div>
+    </div>
+  </div>
+  <footer class="menu-footer">
+    <span>WASD 移动 · 鼠标 视角 · SHIFT 加速 · E 互动 · V 视角 · M 静音 · ESC 暂停</span>
+    <span class="menu-build">v1.0 · 单关试玩 · 大湾区大学 W05</span>
+  </footer>
+</div>
+
+<!-- ========== 剧情 ========== -->
+<div id="story" class="screen story hidden">
+  <div class="letterbox top"></div>
+  <div class="letterbox bottom"></div>
+  <div class="story-chapter"><span id="story-chapter">1999 · 奶蛙乐园</span></div>
+  <div class="story-block">
+    <div class="story-line" id="story-line"></div>
+    <div class="story-caption" id="story-caption"></div>
+  </div>
+  <button class="story-skip" id="story-skip">跳过 · SKIP <span>任意键</span></button>
+  <div class="story-timeline"><div id="story-progress"></div></div>
+</div>
+
+<!-- ========== 点击开始游玩 ========== -->
+<div id="ready" class="screen ready hidden">
+  <div class="ready-inner">
+    <div class="ready-kicker">第 1 夜 · 22:07</div>
+    <div class="ready-title">取回你的奶片</div>
+    <p>先找到 <b>3 片</b>，乐园地图会亮起；再找到 <b>3 片</b>，你就能跑得更快。<br />凑齐 <b>8 片</b>，从安全出口离开。</p>
+    <button id="btn-enter" class="btn primary"><span>点击进入</span><em>CLICK TO PLAY</em></button>
+    <div class="ready-note">鼠标将被锁定 · 按 ESC 暂停</div>
+  </div>
+</div>
+
+<!-- ========== 暂停 ========== -->
+<div id="pause" class="screen modal hidden">
+  <div class="modal-card">
+    <div class="modal-kicker">PAUSED</div>
+    <h2>暂停</h2>
+    <p class="modal-sub">乐园还在等你。</p>
+    <div class="modal-actions">
+      <button id="btn-resume" class="btn primary"><span>继续游戏</span><em>RESUME</em></button>
+      <button id="btn-restart" class="btn"><span>重新开始</span><em>RESTART</em></button>
+      <button id="btn-menu" class="btn ghost"><span>返回主菜单</span><em>MENU</em></button>
+    </div>
+    <div class="modal-audio">
+      <button id="btn-pause-mute" class="mute-btn">♪</button>
+      <input id="pause-volume" class="volume" type="range" min="0" max="100" value="70" aria-label="音量" />
+    </div>
+  </div>
+</div>
+
+<!-- ========== 操作说明 ========== -->
+<div id="help" class="screen modal hidden">
+  <div class="modal-card wide">
+    <div class="modal-kicker">HOW TO PLAY</div>
+    <h2>操作说明</h2>
+    <div class="help-grid">
+      <div><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd><span>移动</span></div>
+      <div><kbd>鼠标</kbd><span>转动视角</span></div>
+      <div><kbd>SHIFT</kbd><span>加速（解锁后）</span></div>
+      <div><kbd>E</kbd><span>互动 / 开门</span></div>
+      <div><kbd>V</kbd><span>第一 / 第三人称</span></div>
+      <div><kbd>F</kbd><span>手电筒</span></div>
+      <div><kbd>M</kbd><span>静音</span></div>
+      <div><kbd>ESC</kbd><span>暂停</span></div>
+    </div>
+    <ul class="help-rules">
+      <li>收集 <b>8 片奶片</b>，从安全出口离开，就算活过这一夜。</li>
+      <li>奶蛙会一直跟着你，但追不上正常行走的你。<b>站着不动</b>或<b>被堵死</b>时，它们才会靠近。</li>
+      <li>解锁加速后，按住 <kbd>SHIFT</kbd> 冲刺可以把它们甩开。糖分会自动恢复。</li>
+      <li>听到「我是奶龙！我才是奶龙！」越来越响，说明它离你越来越近。</li>
+    </ul>
+    <button id="btn-help-close" class="btn primary"><span>知道了</span><em>CLOSE</em></button>
+  </div>
+</div>
+
+<!-- ========== 结算 ========== -->
+<div id="win" class="screen result win hidden">
+  <div class="result-vignette"></div>
+  <div class="result-inner">
+    <div class="result-kicker">06:14 · 天亮了</div>
+    <h2>你带走了最后八片奶片。</h2>
+    <p class="result-text">乐园安静下来。推土机明天会来，把蛋糕、蜡笔和歌声一起推平。<br />你回头看了一眼——门厅里，好像还有一个小小的影子在朝你挥手。</p>
+    <div class="result-stats" id="win-stats"></div>
+    <div class="modal-actions">
+      <button id="btn-win-replay" class="btn primary"><span>再玩一次</span><em>REPLAY</em></button>
+      <button id="btn-win-menu" class="btn ghost"><span>返回主菜单</span><em>MENU</em></button>
+    </div>
+  </div>
+</div>
+
+<div id="lose" class="screen result lose hidden">
+  <div class="result-vignette"></div>
+  <div class="result-inner">
+    <div class="result-kicker">22:44 · 你停下了</div>
+    <h2>你被找到了。</h2>
+    <p class="result-text">它们围过来，很有礼貌地给你让出一个位置。<br />蛋糕上的蜡烛又亮了一根。<br /><b>“欢迎新朋友。”</b></p>
+    <div class="modal-actions">
+      <button id="btn-lose-retry" class="btn primary"><span>再试一次</span><em>RETRY</em></button>
+      <button id="btn-lose-menu" class="btn ghost"><span>返回主菜单</span><em>MENU</em></button>
+    </div>
+  </div>
+</div>
+
+<!-- ========== 演示模式横幅 ========== -->
+<div id="demo-banner" class="demo-banner hidden">
+  <span class="rec-dot"></span>
+  <b>演示模式 · DEMO</b>
+  <span class="demo-hint">自动演示真实游戏 · 按 ESC 退出</span>
+</div>
+
+<!-- ========== 加载 ========== -->
+<div id="loading" class="screen loading">
+  <div class="loading-inner">
+    <div class="loading-kicker">MILK FROG PARK</div>
+    <div class="loading-title">奶蛙乐园</div>
+    <div class="loading-bar"><div id="loading-fill"></div></div>
+    <div class="loading-status" id="loading-status">正在布置生日会……</div>
+    <div class="loading-tip">提示：如果听到歌声，请不要回头。</div>
+  </div>
+</div>
+
+<div id="jumpscare" class="jumpscare hidden" aria-hidden="true"><img id="jumpscare-img" alt="" /></div>
+<div id="fade" class="fade"></div>
+<div id="flash" class="flash"></div>
+
+<noscript><div class="noscript">这个游戏需要启用 JavaScript。</div></noscript>
+<script type="module" src="./src/main.js"></script>
+</body>
+</html>

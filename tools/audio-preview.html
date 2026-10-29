@@ -1,0 +1,386 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>奶蛙乐园 · 音频试听台</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ctext y='26' font-size='26'%3E%F0%9F%90%B8%3C/text%3E%3C/svg%3E">
+<style>
+  :root{
+    --cream:#ffd9a0; --pink:#f7b6c2; --mint:#a9d6c4; --wood:#b07a4a;
+    --night:#120a0d; --night2:#1a0f12; --purple:#3b2344; --glow:#7dffb0;
+    --ink:#e8dccd; --dim:#9a8a80;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0}
+  body{
+    background:
+      radial-gradient(1200px 600px at 70% -10%, #2a1620 0%, transparent 60%),
+      radial-gradient(900px 500px at 10% 110%, #17251f 0%, transparent 55%),
+      var(--night);
+    color:var(--ink);
+    font-family:"Noto Sans SC","Microsoft YaHei",system-ui,-apple-system,sans-serif;
+    min-height:100vh;
+    padding:32px 28px 80px;
+  }
+  body::after{
+    content:"";position:fixed;inset:0;pointer-events:none;z-index:0;
+    background:repeating-linear-gradient(180deg, rgba(255,255,255,.02) 0 1px, transparent 1px 3px);
+    mix-blend-mode:overlay;opacity:.5;
+  }
+  header{position:relative;z-index:1;max-width:1180px;margin:0 auto 26px}
+  .kicker{font-size:11px;letter-spacing:.42em;color:var(--wood);text-transform:uppercase;margin-bottom:10px}
+  h1{
+    font-family:"Songti SC","Noto Serif SC","SimSun",serif;font-weight:600;
+    font-size:clamp(26px,3.4vw,40px);letter-spacing:.14em;margin:0 0 8px;
+    color:var(--cream);text-shadow:0 0 26px rgba(255,217,160,.18);
+  }
+  h1 small{display:block;font-size:12px;letter-spacing:.5em;color:var(--dim);margin-top:10px;font-family:inherit}
+  .rule{height:1px;background:linear-gradient(90deg,var(--wood),transparent 72%);margin:18px 0 14px}
+  .sub{font-size:13px;color:var(--dim);line-height:1.9}
+  .sub code{color:var(--mint);background:rgba(169,214,196,.08);padding:1px 6px;border-radius:3px}
+  main{position:relative;z-index:1;max-width:1180px;margin:0 auto}
+
+  .bar{
+    position:sticky;top:0;z-index:5;display:flex;flex-wrap:wrap;gap:14px 22px;align-items:center;
+    padding:14px 16px;margin:0 0 18px;border-radius:10px;
+    background:rgba(26,15,18,.88);backdrop-filter:blur(8px);
+    border:1px solid rgba(176,122,74,.28);
+  }
+  .bar label{font-size:12px;letter-spacing:.12em;color:var(--dim);display:flex;align-items:center;gap:8px}
+  input[type=range]{accent-color:var(--pink);width:150px}
+  .chip{
+    font-size:12px;letter-spacing:.06em;padding:5px 12px;border-radius:999px;cursor:pointer;
+    border:1px solid rgba(176,122,74,.4);color:var(--ink);background:transparent;transition:.15s;
+    font-family:inherit;
+  }
+  .chip:hover{border-color:var(--pink);color:var(--pink)}
+  .chip.on{background:rgba(247,182,194,.14);border-color:var(--pink);color:var(--pink)}
+  .spacer{flex:1}
+  #meter{width:74px;height:6px;border-radius:3px;background:rgba(255,255,255,.08);overflow:hidden}
+  #meter i{display:block;height:100%;width:0;background:linear-gradient(90deg,var(--mint),var(--pink))}
+
+  .group-title{
+    font-family:"Songti SC","Noto Serif SC",serif;font-size:15px;letter-spacing:.3em;
+    color:var(--cream);margin:26px 0 10px;padding-left:2px;opacity:.92;
+  }
+  .group-title span{font-family:"Noto Sans SC","Microsoft YaHei",sans-serif;letter-spacing:.06em;font-size:11px;color:var(--dim);margin-left:10px}
+
+  .row{
+    display:grid;grid-template-columns:34px 232px 62px 1fr 132px;gap:14px;align-items:center;
+    padding:11px 14px;border-bottom:1px solid rgba(255,255,255,.055);
+    transition:background .15s;
+  }
+  .row:hover{background:rgba(255,217,160,.035)}
+  .row.playing{background:rgba(247,182,194,.07)}
+  .idx{font-size:11px;color:var(--dim);font-variant-numeric:tabular-nums}
+  .name{font-size:13px;color:var(--ink);letter-spacing:.04em}
+  .name b{color:var(--cream);font-weight:600}
+  .name em{display:block;font-style:normal;font-size:11.5px;color:var(--dim);margin-top:3px;line-height:1.65}
+  .name .vo-line{color:var(--mint);opacity:.92;margin-top:4px}
+  .kind{font-size:10.5px;letter-spacing:.14em;padding:3px 7px;border-radius:4px;text-align:center;border:1px solid transparent;white-space:nowrap;display:inline-block}
+  .kind.music{color:var(--cream);border-color:rgba(255,217,160,.35)}
+  .kind.ambience{color:var(--mint);border-color:rgba(169,214,196,.35)}
+  .kind.voice{color:var(--pink);border-color:rgba(247,182,194,.35)}
+  .kind.sfx{color:var(--dim);border-color:rgba(154,138,128,.35)}
+  .mid{min-width:0}
+  .prog{height:14px;position:relative;cursor:pointer;border-radius:4px;background:rgba(255,255,255,.05)}
+  .prog i{position:absolute;left:0;top:0;bottom:0;width:0;background:linear-gradient(90deg,rgba(169,214,196,.55),rgba(247,182,194,.6));border-radius:4px}
+  .meta{display:flex;gap:14px;font-size:11px;color:var(--dim);margin-top:5px;font-variant-numeric:tabular-nums}
+  .meta .loopdot{color:var(--glow)}
+  .ctl{display:flex;gap:6px;align-items:center;justify-content:flex-end}
+  button.play{
+    width:34px;height:34px;border-radius:50%;border:1px solid rgba(255,217,160,.4);
+    background:rgba(255,217,160,.06);color:var(--cream);cursor:pointer;font-size:12px;
+    display:grid;place-items:center;transition:.15s;flex:none;
+  }
+  button.play:hover{background:rgba(255,217,160,.18);border-color:var(--cream);transform:scale(1.06)}
+  .row.playing button.play{border-color:var(--pink);color:var(--pink);box-shadow:0 0 14px rgba(247,182,194,.35)}
+  .loopbtn{
+    font-size:10.5px;letter-spacing:.08em;padding:5px 8px;border-radius:5px;cursor:pointer;
+    background:transparent;border:1px solid rgba(255,255,255,.14);color:var(--dim);font-family:inherit;
+  }
+  .loopbtn.on{color:var(--glow);border-color:rgba(125,255,176,.55);background:rgba(125,255,176,.08)}
+  footer{max-width:1180px;margin:44px auto 0;font-size:12px;color:var(--dim);line-height:2}
+  footer code{color:var(--mint)}
+  .empty{padding:40px;text-align:center;color:#c86;font-size:14px;line-height:2}
+  .empty a{color:var(--pink)}
+  @media (max-width:900px){
+    .row{grid-template-columns:26px 1fr;gap:8px 10px;padding:12px}
+    .kind{grid-column:2;justify-self:start}
+    .mid{grid-column:2}
+    .ctl{grid-column:2;justify-content:flex-start}
+  }
+</style>
+</head>
+<body>
+<header>
+  <div class="kicker">MILK FROG PARK · AUDIO BENCH</div>
+  <h1>奶蛙乐园：午夜奶片<small>原 创 音 频 试 听 台</small></h1>
+  <div class="rule"></div>
+  <div class="sub">
+    数据来自 <code>assets/audio/manifest.json</code>；全部音轨由 <code>tools/gen_audio.py</code> 用 Windows 中文语音 + numpy 程序化合成，无任何第三方音频。
+  </div>
+</header>
+
+<main>
+  <div class="bar">
+    <label>总音量 <input id="master" type="range" min="0" max="100" value="80"><span id="masterVal" style="color:var(--cream);min-width:34px;display:inline-block">80%</span></label>
+    <div class="spacer"></div>
+    <button class="chip on" data-filter="all">全部</button>
+    <button class="chip" data-filter="music">音乐</button>
+    <button class="chip" data-filter="ambience">环境</button>
+    <button class="chip" data-filter="voice">人声</button>
+    <button class="chip" data-filter="sfx">音效</button>
+    <div class="spacer"></div>
+    <label><input id="multi" type="checkbox"> 允许多轨同时播放</label>
+    <label><input id="autoloop" type="checkbox" checked> 循环轨默认循环</label>
+    <div id="meter"><i></i></div>
+  </div>
+  <div id="list"></div>
+  <div id="state" class="sub" style="margin-top:18px"></div>
+</main>
+
+<footer>
+  快捷键：<code>空格</code> 播放/暂停当前轨 · <code>Esc</code> 全部停止。<br>
+  引擎侧只需读 manifest：<code>file</code> 相对仓库根、<code>gain</code> 建议基础增益、<code>loop</code> 是否循环。<br>
+  本页仅用于试听，不参与游戏运行。
+</footer>
+
+<script type="module">
+const KIND_LABEL = { music:'音乐', ambience:'环境', voice:'人声', sfx:'音效' };
+const KIND_ORDER = ['music','ambience','voice','sfx'];
+const ROOT = new URL('../', location.href);
+
+let manifest = null;
+let tracks = [];
+let master = 0.8;
+let current = null;
+let multi = false;
+let autoLoop = true;
+
+const listEl = document.getElementById('list');
+const stateEl = document.getElementById('state');
+const meterEl = document.querySelector('#meter i');
+const masterEl = document.getElementById('master');
+const masterVal = document.getElementById('masterVal');
+
+function fmtTime(s){
+  if(!isFinite(s)) return '--:--';
+  const m = Math.floor(s/60), ss = Math.floor(s%60);
+  return m + ':' + String(ss).padStart(2,'0');
+}
+function esc(s){
+  return String(s == null ? '' : s).replace(/[&<>"]/g, function(c){
+    return ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'})[c];
+  });
+}
+
+async function boot(){
+  try{
+    const res = await fetch(new URL('assets/audio/manifest.json', ROOT), {cache:'no-store'});
+    if(!res.ok) throw new Error('HTTP ' + res.status);
+    manifest = await res.json();
+  }catch(err){
+    listEl.innerHTML = '<div class="empty">读不到 manifest.json（' + err.message + '）<br>请用 <a href="http://127.0.0.1:8000/tools/audio-preview.html">python serve.py 8000</a> 以 http:// 打开本页。</div>';
+    return;
+  }
+  const entries = Object.entries(manifest.tracks || {});
+  tracks = entries.map(function(pair){ return Object.assign({ key: pair[0], el: null }, pair[1]); });
+  render();
+  stateEl.textContent = '共 ' + tracks.length + ' 条音轨 · 生成器 ' + (manifest.generator || '?') + ' · ' + (manifest.generated || '');
+}
+
+let audioCtx = null, analyser = null, masterGain = null, raf = 0;
+function ensureAudioGraph(){
+  if(!audioCtx){
+    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    masterGain = audioCtx.createGain();
+    analyser = audioCtx.createAnalyser();
+    analyser.fftSize = 256;
+    masterGain.connect(analyser);
+    analyser.connect(audioCtx.destination);
+    drawMeter();
+  }
+  if(audioCtx.state === 'suspended') audioCtx.resume();
+}
+function drawMeter(){
+  const buf = new Uint8Array(analyser.frequencyBinCount);
+  cancelAnimationFrame(raf);
+  const tick = function(){
+    analyser.getByteTimeDomainData(buf);
+    let sum = 0;
+    for(let i=0;i<buf.length;i++){ const v = (buf[i]-128)/128; sum += v*v; }
+    meterEl.style.width = Math.min(100, Math.sqrt(sum/buf.length)*260) + '%';
+    raf = requestAnimationFrame(tick);
+  };
+  tick();
+}
+function attachMeter(audio){
+  if(audio.__wired) return;
+  audio.__wired = true;
+  try{
+    const src = audioCtx.createMediaElementSource(audio);
+    src.connect(masterGain);
+  }catch(e){ /* 不支持时退回元素自身音量 */ }
+}
+
+function effectiveVolume(t){
+  return Math.min(1, (t.gain == null ? 0.8 : t.gain) * master);
+}
+function applyGains(){
+  tracks.forEach(function(t){ if(t.el) t.el.volume = effectiveVolume(t); });
+}
+function stopAll(except){
+  tracks.forEach(function(t){
+    if(t.el && t.el !== except && !t.el.paused){ t.el.pause(); t.el.currentTime = 0; }
+  });
+}
+function markPlaying(key){
+  document.querySelectorAll('.row').forEach(function(r){
+    r.classList.toggle('playing', r.dataset.key === key);
+  });
+}
+
+function play(t){
+  ensureAudioGraph();
+  if(!t.el){
+    t.el = new Audio(new URL(t.file, ROOT).href);
+    t.el.preload = 'auto';
+    t.el.loop = autoLoop ? !!t.loop : false;
+    t.__userLoop = autoLoop ? !!t.loop : false;
+    t.el.volume = effectiveVolume(t);
+    attachMeter(t.el);
+  }
+  if(!multi) stopAll(t.el);
+  t.el.currentTime = 0;
+  t.el.play().then(function(){
+    current = t;
+    markPlaying(t.key);
+    stateEl.textContent = '正在播放：' + t.key + '  ' + fmtTime(t.el.duration || t.duration);
+  }).catch(function(err){
+    stateEl.textContent = '播放失败：' + err.message;
+  });
+}
+function toggle(t){
+  if(!t.el){ play(t); return; }
+  if(!t.el.paused){ t.el.pause(); return; }
+  ensureAudioGraph();
+  if(!multi) stopAll(t.el);
+  t.el.play();
+  current = t;
+  markPlaying(t.key);
+}
+
+function render(){
+  listEl.innerHTML = '';
+  KIND_ORDER.forEach(function(kind){
+    const group = tracks.filter(function(t){ return t.kind === kind; });
+    if(!group.length) return;
+    const title = document.createElement('div');
+    title.className = 'group-title';
+    title.dataset.kind = kind;
+    title.innerHTML = KIND_LABEL[kind] + '<span>' + kind + ' · ' + group.length + ' 条</span>';
+    listEl.appendChild(title);
+    group.forEach(function(t, i){ listEl.appendChild(buildRow(t, i + 1)); });
+  });
+}
+
+function buildRow(t, idx){
+  const row = document.createElement('div');
+  row.className = 'row';
+  row.dataset.key = t.key;
+  row.dataset.kind = t.kind;
+
+  const sub = t.text ? '<em class="vo-line">「' + esc(t.text) + '」</em>' : '';
+  row.innerHTML =
+    '<div class="idx">' + String(idx).padStart(2,'0') + '</div>' +
+    '<div class="name"><b>' + esc(t.key) + '</b><em>' + esc(t.desc || '') + '</em>' + sub + '</div>' +
+    '<div><span class="kind ' + t.kind + '">' + (KIND_LABEL[t.kind] || t.kind) + '</span></div>' +
+    '<div class="mid">' +
+      '<div class="prog"><i></i></div>' +
+      '<div class="meta"><span class="dur">0:00 / ' + fmtTime(t.duration) + '</span>' +
+      '<span>gain ' + (t.gain == null ? '-' : t.gain) + '</span>' +
+      '<span class="loopdot">' + (t.loop ? '● 可循环' : '○ 单次') + '</span>' +
+      '<span class="size"></span></div>' +
+    '</div>' +
+    '<div class="ctl"><button class="play" title="播放/暂停">▶</button>' +
+      '<button class="loopbtn' + (t.loop ? ' on' : '') + '" title="循环开关">循环</button></div>';
+
+  const btn = row.querySelector('.play');
+  const loopBtn = row.querySelector('.loopbtn');
+  const prog = row.querySelector('.prog');
+  const progFill = row.querySelector('.prog i');
+  const durEl = row.querySelector('.dur');
+
+  btn.addEventListener('click', function(){ toggle(t); });
+  loopBtn.addEventListener('click', function(){
+    t.__userLoop = !t.__userLoop;
+    loopBtn.classList.toggle('on', t.__userLoop);
+    if(t.el) t.el.loop = t.__userLoop;
+  });
+  prog.addEventListener('click', function(ev){
+    if(!t.el) return;
+    const r = prog.getBoundingClientRect();
+    const p = Math.max(0, Math.min(1, (ev.clientX - r.left) / r.width));
+    t.el.currentTime = p * (t.el.duration || t.duration);
+  });
+  t.__update = function(){
+    const d = (t.el && t.el.duration) || t.duration;
+    const c = (t.el && t.el.currentTime) || 0;
+    progFill.style.width = (d ? (c / d * 100) : 0) + '%';
+    durEl.textContent = fmtTime(c) + ' / ' + fmtTime(d);
+  };
+
+  fetch(new URL(t.file, ROOT), { method:'HEAD' }).then(function(r){
+    const len = r.headers.get('content-length');
+    if(len) row.querySelector('.size').textContent = (len / 1024 / 1024).toFixed(2) + ' MB';
+  }).catch(function(){});
+
+  return row;
+}
+
+setInterval(function(){
+  tracks.forEach(function(t){ if(t.__update) t.__update(); });
+}, 100);
+
+masterEl.addEventListener('input', function(){
+  master = masterEl.value / 100;
+  masterVal.textContent = masterEl.value + '%';
+  applyGains();
+});
+document.getElementById('multi').addEventListener('change', function(e){ multi = e.target.checked; });
+document.getElementById('autoloop').addEventListener('change', function(e){
+  autoLoop = e.target.checked;
+  tracks.forEach(function(t){ if(t.el) t.el.loop = autoLoop ? !!t.loop : false; });
+});
+
+document.querySelectorAll('[data-filter]').forEach(function(b){
+  b.addEventListener('click', function(){
+    document.querySelectorAll('[data-filter]').forEach(function(x){ x.classList.remove('on'); });
+    b.classList.add('on');
+    const f = b.dataset.filter;
+    document.querySelectorAll('.row').forEach(function(r){
+      r.style.display = (f === 'all' || r.dataset.kind === f) ? '' : 'none';
+    });
+    document.querySelectorAll('.group-title').forEach(function(g){
+      g.style.display = (f === 'all' || g.dataset.kind === f) ? '' : 'none';
+    });
+  });
+});
+
+document.addEventListener('keydown', function(e){
+  if(e.code === 'Escape'){
+    stopAll(null); current = null; markPlaying(null);
+  }
+  if(e.code === 'Space' && e.target.tagName !== 'BUTTON' && e.target.tagName !== 'INPUT'){
+    e.preventDefault();
+    const t = current || tracks[0];
+    if(t) toggle(t);
+  }
+});
+
+boot();
+</script>
+</body>
+</html>
