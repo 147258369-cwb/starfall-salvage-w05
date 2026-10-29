@@ -3586,40 +3586,81 @@ export function createTextures() {
       return memo('frogFace', () => {
         const surface = mkCanvas(TILE, TILE);
         const ctx = surface.ctx;
-        /* 整张皮肤 */
-        const g = ctx.createLinearGradient(0, 0, 0, TILE);
-        g.addColorStop(0, '#dceb92');
-        g.addColorStop(0.55, '#bed668');
-        g.addColorStop(1, '#9db94e');
-        ctx.fillStyle = g;
+        /* 奶蛙：AI 变异奶龙的黄色软胶皮肤，近距离贴脸时的大笑表情 */
+        const skin = ctx.createRadialGradient(256, 220, 40, 256, 256, 380);
+        skin.addColorStop(0, '#ffe168');
+        skin.addColorStop(0.55, '#f4d342');
+        skin.addColorStop(1, '#c9a322');
+        ctx.fillStyle = skin;
         ctx.fillRect(0, 0, TILE, TILE);
-        /* 皮肤颗粒 */
-        applyGrain(ctx, TILE, TILE, { seed: hashSeed('frog-skin'), grain: 12, mottle: 0.08, cells: 6 });
-        const rnd = mulberry32(hashSeed('frog-skin-speckle'));
-        for (let i = 0; i < 70; i++) {
-          const x = rnd() * TILE;
-          const y = rnd() * TILE;
-          const r = 1 + rnd() * 4;
-          dot(ctx, x, y, r, rnd() > 0.4 ? '#8fae45' : '#d7e79c', 0.18 + rnd() * 0.25);
+        applyGrain(ctx, TILE, TILE, { seed: hashSeed('naiwa-skin'), grain: 10, mottle: 0.07, cells: 5 });
+        const rnd = mulberry32(hashSeed('naiwa-specks'));
+        for (let i = 0; i < 90; i++) {
+          dot(ctx, rnd() * TILE, rnd() * TILE, 1 + rnd() * 3, rnd() > 0.5 ? '#e6c23c' : '#ffe89a', 0.1 + rnd() * 0.18);
         }
-        /* 五官 */
-        drawFrogHead(ctx, 256, 248, 198, {
-          seed: 'frog-face',
-          headFill: false,
-          pupilX: 0.015,
-          pupilY: 0.025,
-          pupilScale: 0.15,
-          blush: 0.4,
-          milk: true,
-          mouthWide: 1.05,
-        });
-        /* 四周压暗，球体感 */
-        const vig = ctx.createRadialGradient(256, 256, 150, 256, 256, 365);
-        vig.addColorStop(0, 'rgba(20,30,8,0)');
-        vig.addColorStop(1, 'rgba(20,30,8,0.55)');
+        /* 两只大圆眼：绿色虹膜 + 黑瞳 + 高光；刻意略不对称 */
+        const eyes = [
+          { x: 168, y: 170, r: 78, px: 5, py: 6, pr: 53 },
+          { x: 344, y: 166, r: 74, px: -6, py: 4, pr: 49 },
+        ];
+        for (const e of eyes) {
+          const iris = ctx.createRadialGradient(e.x, e.y, e.r * 0.2, e.x, e.y, e.r);
+          iris.addColorStop(0, '#8fae43');
+          iris.addColorStop(0.72, '#6c8f36');
+          iris.addColorStop(1, '#3f5a1c');
+          ctx.fillStyle = iris;
+          ctx.beginPath(); ctx.arc(e.x, e.y, e.r, 0, TAU); ctx.fill();
+          const pupil = ctx.createRadialGradient(e.x + e.px, e.y + e.py, 2, e.x + e.px, e.y + e.py, e.pr);
+          pupil.addColorStop(0, '#1b1a13');
+          pupil.addColorStop(0.82, '#070705');
+          pupil.addColorStop(1, '#241f0b');
+          ctx.fillStyle = pupil;
+          ctx.beginPath(); ctx.arc(e.x + e.px, e.y + e.py, e.pr, 0, TAU); ctx.fill();
+          ctx.fillStyle = 'rgba(255,250,226,.92)';
+          ctx.beginPath(); ctx.arc(e.x - e.r * 0.28, e.y - e.r * 0.3, e.r * 0.1, 0, TAU); ctx.fill();
+          ctx.strokeStyle = 'rgba(30,40,10,.55)';
+          ctx.lineWidth = 3;
+          ctx.beginPath(); ctx.arc(e.x, e.y, e.r, 0, TAU); ctx.stroke();
+        }
+        /* 两个小鼻孔 */
+        ctx.fillStyle = '#4b3a12';
+        ctx.beginPath(); ctx.ellipse(238, 252, 6, 5, 0, 0, TAU); ctx.fill();
+        ctx.beginPath(); ctx.ellipse(274, 252, 6, 5, 0, 0, TAU); ctx.fill();
+        /* 裂开的巨口 + 人牙 + 舌头 */
+        const mouth = ctx.createRadialGradient(256, 400, 20, 256, 410, 170);
+        mouth.addColorStop(0, '#2a0b09');
+        mouth.addColorStop(0.65, '#160403');
+        mouth.addColorStop(1, '#080101');
+        ctx.fillStyle = mouth;
+        ctx.beginPath();
+        ctx.ellipse(256, 338, 140, 70, 0, 0, TAU);
+        ctx.fill();
+        ctx.strokeStyle = 'rgba(80,44,12,.75)';
+        ctx.lineWidth = 12;
+        ctx.beginPath(); ctx.ellipse(256, 338, 140, 70, 0, 0, TAU); ctx.stroke();
+        ctx.fillStyle = '#f1e6c8';
+        for (let i = 0; i < 6; i++) {
+          const x = 132 + i * 50;
+          const r = 12 + Math.abs(i - 2.5) * 2;
+          ctx.beginPath(); ctx.roundRect(x - 17, 278, 34, 36 + r, 9); ctx.fill();
+        }
+        for (let i = 0; i < 5; i++) {
+          const x = 158 + i * 50;
+          ctx.beginPath(); ctx.roundRect(x - 15, 382, 30, 28, 8); ctx.fill();
+        }
+        const tongue = ctx.createRadialGradient(256, 484, 8, 256, 490, 90);
+        tongue.addColorStop(0, '#d06a72');
+        tongue.addColorStop(1, '#7e2f38');
+        ctx.fillStyle = tongue;
+        ctx.beginPath(); ctx.ellipse(256, 398, 76, 24, 0, 0, TAU); ctx.fill();
+        /* 暗角与颗粒 */
+        const vig = ctx.createRadialGradient(256, 256, 140, 256, 256, 370);
+        vig.addColorStop(0, 'rgba(10,6,2,0)');
+        vig.addColorStop(0.72, 'rgba(10,6,2,.18)');
+        vig.addColorStop(1, 'rgba(10,6,2,.78)');
         ctx.fillStyle = vig;
         ctx.fillRect(0, 0, TILE, TILE);
-        addDust(ctx, TILE, TILE, hashSeed('frog-face-dust'), 40);
+        addDust(ctx, TILE, TILE, hashSeed('naiwa-dust'), 60);
         return makeTexture(surface.canvas, false, 'frogFace', { kind: 'frogFace' });
       });
     },

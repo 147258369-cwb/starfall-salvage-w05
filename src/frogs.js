@@ -6,97 +6,130 @@ const C = GRID.cell;
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 const damp = (a, b, l, dt) => b + (a - b) * Math.exp(-l * dt);
 
+// 奶蛙 = 奶龙的 AI 变异体：黄色软胶身体、绿色圆眼、极小嘴；
+// 参考网络「奶蛙」表情包，不使用官方奶龙素材。靠近时裂开成大笑巨口。
 const VARIANTS = {
-  small: { bodyColor: 0xd6d46c, scale: 0.8, bodyScale: [1, 1.05, 0.95], eyeR: 0.25, legLen: 0.34, speed: 4.45, radius: 0.48 },
-  fat:   { bodyColor: 0xcec05a, scale: 1.28, bodyScale: [1.25, 1.0, 1.15], eyeR: 0.2, legLen: 0.26, speed: 4.15, radius: 0.66 },
-  tall:  { bodyColor: 0xc4c97d, scale: 1.02, bodyScale: [0.92, 1.2, 0.9], eyeR: 0.22, legLen: 0.85, speed: 4.35, radius: 0.5 },
+  small: { bodyColor: 0xf4d64a, scale: 0.78, bodyScale: [1.0, 1.14, 0.98], eyeR: 0.2, legLen: 0.3, speed: 4.45, radius: 0.48, seed: 1 },
+  fat:   { bodyColor: 0xf2d247, scale: 1.3, bodyScale: [1.2, 1.02, 1.12], eyeR: 0.17, legLen: 0.24, speed: 4.15, radius: 0.66, seed: 2 },
+  tall:  { bodyColor: 0xf6dc5a, scale: 1.0, bodyScale: [0.9, 1.34, 0.92], eyeR: 0.19, legLen: 0.55, speed: 4.35, radius: 0.5, seed: 3 },
 };
 
 function buildFrogModel(variant) {
   const v = VARIANTS[variant];
   const g = new THREE.Group();
-  const mat = new THREE.MeshStandardMaterial({ color: v.bodyColor, roughness: 0.55, metalness: 0.02 });
-  const belly = new THREE.MeshStandardMaterial({ color: 0xe8e3a8, roughness: 0.7 });
-  const white = new THREE.MeshStandardMaterial({ color: 0xf7f4e6, roughness: 0.25, emissive: 0xfff6dd, emissiveIntensity: 0.35 });
-  const black = new THREE.MeshStandardMaterial({ color: 0x0b0a08, roughness: 0.2 });
-  const mouthMat = new THREE.MeshStandardMaterial({ color: 0x40151b, roughness: 0.6 });
-  const pink = new THREE.MeshStandardMaterial({ color: 0xe8a0a8, roughness: 0.8 });
+  const yellow = new THREE.MeshStandardMaterial({ color: v.bodyColor, roughness: 0.38, metalness: 0.02, emissive: 0x3a2a05, emissiveIntensity: 0.12 });
+  const bellyMat = new THREE.MeshStandardMaterial({ color: 0xf7e9b6, roughness: 0.5 });
+  const irisMat = new THREE.MeshStandardMaterial({ color: 0x6f963c, roughness: 0.45, emissive: 0x1c2a08, emissiveIntensity: 0.4 });
+  const black = new THREE.MeshStandardMaterial({ color: 0x0a0906, roughness: 0.12 });
+  const shine = new THREE.MeshBasicMaterial({ color: 0xfff8e0 });
+  const mouthMat = new THREE.MeshStandardMaterial({ color: 0x3a1a12, roughness: 0.7 });
+  const toothMat = new THREE.MeshStandardMaterial({ color: 0xf3ead2, roughness: 0.35 });
+  const tongueMat = new THREE.MeshStandardMaterial({ color: 0xb9545c, roughness: 0.6 });
 
-  const body = new THREE.Mesh(new THREE.SphereGeometry(0.52, 22, 18), mat);
+  const bodyY = 0.78 + v.legLen;
+  const body = new THREE.Mesh(new THREE.SphereGeometry(0.62, 24, 20), yellow);
   body.scale.set(...v.bodyScale);
-  body.position.y = 0.58 + v.legLen;
+  body.position.y = bodyY;
   g.add(body);
 
-  const bellyMesh = new THREE.Mesh(new THREE.SphereGeometry(0.4, 18, 14), belly);
-  bellyMesh.scale.set(0.85, 0.9, 0.5);
-  bellyMesh.position.set(0, 0.52 + v.legLen, 0.28);
-  g.add(bellyMesh);
+  // 奶龙式奶油色肚皮
+  const belly = new THREE.Mesh(new THREE.SphereGeometry(0.42, 20, 16), bellyMat);
+  belly.scale.set(1.0, 0.82, 0.3);
+  belly.position.set(0, bodyY - 0.27, 0.55);
+  g.add(belly);
 
-  // 眼睛（前脸 +Z）
+  // 绿色大圆眼 + 黑瞳 + 高光（无眼白，参考奶蛙）
   const eyes = [];
   for (const s of [-1, 1]) {
-    const eye = new THREE.Mesh(new THREE.SphereGeometry(v.eyeR, 16, 12), white);
-    eye.position.set(s * 0.22, 0.78 + v.legLen, 0.36);
-    g.add(eye);
-    const pupil = new THREE.Mesh(new THREE.SphereGeometry(v.eyeR * 0.26, 10, 8), black);
-    pupil.position.set(s * 0.2, 0.78 + v.legLen, 0.36 + v.eyeR * 0.92);
+    const jitter = (v.seed - 2) * 0.006;
+    const ring = new THREE.Mesh(new THREE.SphereGeometry(v.eyeR * 1.16, 18, 14), irisMat);
+    ring.scale.set(1, 1, 0.42);
+    ring.position.set(s * 0.23 + jitter, bodyY + 0.27, 0.52);
+    g.add(ring);
+    const pupil = new THREE.Mesh(new THREE.SphereGeometry(v.eyeR, 16, 12), black);
+    pupil.position.set(s * 0.225 + jitter, bodyY + 0.27, 0.55);
     g.add(pupil);
-    eyes.push({ eye, pupil });
+    const highlight = new THREE.Mesh(new THREE.SphereGeometry(v.eyeR * 0.18, 8, 6), shine);
+    highlight.position.set(s * 0.225 + jitter - 0.04, bodyY + 0.31, 0.62);
+    g.add(highlight);
+    eyes.push({ ring, pupil, highlight });
   }
-  // 微笑
-  const mouth = new THREE.Mesh(new THREE.TorusGeometry(0.22, 0.028, 6, 22, Math.PI), mouthMat);
-  mouth.position.set(0, 0.46 + v.legLen, 0.47);
+
+  // 极小的一条嘴
+  const mouth = new THREE.Mesh(new THREE.TorusGeometry(0.082, 0.013, 6, 18, Math.PI), mouthMat);
+  mouth.position.set(0, bodyY + 0.0, 0.64);
   mouth.rotation.z = Math.PI;
   g.add(mouth);
-  // 腮红
+  // 两个小鼻孔
   for (const s of [-1, 1]) {
-    const cheek = new THREE.Mesh(new THREE.CircleGeometry(0.085, 12), pink);
-    cheek.position.set(s * 0.34, 0.58 + v.legLen, 0.42);
-    cheek.rotation.y = s * 0.35;
-    g.add(cheek);
+    const nose = new THREE.Mesh(new THREE.SphereGeometry(0.013, 6, 5), black);
+    nose.position.set(s * 0.055, bodyY + 0.055, 0.635);
+    g.add(nose);
   }
-  // 手
+
+  // 靠近/追逐时才裂开的大笑巨口（参考表情包里失控的奶蛙）
+  const scary = new THREE.Group();
+  scary.position.set(0, bodyY - 0.16, 0.625);
+  const cavity = new THREE.Mesh(new THREE.SphereGeometry(0.27, 20, 16), black);
+  cavity.scale.set(1.18, 0.9, 0.22);
+  scary.add(cavity);
+  for (let i = 0; i < 5; i++) {
+    const tooth = new THREE.Mesh(new THREE.BoxGeometry(0.055, 0.07, 0.02), toothMat);
+    tooth.position.set(-0.16 + i * 0.08, 0.16, 0.055);
+    scary.add(tooth);
+  }
+  for (let i = 0; i < 4; i++) {
+    const tooth = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.055, 0.02), toothMat);
+    tooth.position.set(-0.12 + i * 0.08, -0.16, 0.055);
+    scary.add(tooth);
+  }
+  const tongue = new THREE.Mesh(new THREE.SphereGeometry(0.16, 12, 10), tongueMat);
+  tongue.scale.set(1, 0.5, 0.25);
+  tongue.position.set(0, -0.07, 0.06);
+  scary.add(tongue);
+  scary.visible = false;
+  g.add(scary);
+
+  // 短手（带小手指）
   const arms = [];
   for (const s of [-1, 1]) {
-    const arm = new THREE.Mesh(new THREE.CylinderGeometry(0.055, 0.05, 0.34, 7), mat);
-    arm.position.set(s * 0.44, 0.55 + v.legLen, 0.08);
-    arm.rotation.z = s * 0.5;
+    const arm = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.062, 0.34, 8), yellow);
+    arm.position.set(s * 0.56 * v.bodyScale[0], bodyY - 0.18, 0.06);
+    arm.rotation.z = s * 0.75;
     g.add(arm);
-    const hand = new THREE.Mesh(new THREE.SphereGeometry(0.07, 8, 6), mat);
-    hand.position.y = -0.18;
+    const hand = new THREE.Mesh(new THREE.SphereGeometry(0.095, 10, 8), yellow);
+    hand.position.y = -0.19;
     arm.add(hand);
+    for (let f = -1; f <= 1; f++) {
+      const finger = new THREE.Mesh(new THREE.SphereGeometry(0.026, 6, 5), yellow);
+      finger.position.set(f * 0.04, -0.075, 0.03);
+      hand.add(finger);
+    }
     arms.push(arm);
   }
-  // 腿
+  // 短腿 + 扁脚
   const legs = [];
   for (const s of [-1, 1]) {
-    const leg = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.06, v.legLen + 0.1, 7), mat);
-    leg.position.set(s * 0.2, v.legLen / 2 + 0.03, 0);
+    const leg = new THREE.Mesh(new THREE.CylinderGeometry(0.105, 0.09, v.legLen + 0.14, 9), yellow);
+    leg.position.set(s * 0.22, (v.legLen + 0.14) / 2, 0);
     g.add(leg);
-    const foot = new THREE.Mesh(new THREE.SphereGeometry(0.13, 8, 6), mat);
-    foot.scale.set(1, 0.45, 1.7);
-    foot.position.set(0, -v.legLen / 2 + 0.02, 0.08);
+    const foot = new THREE.Mesh(new THREE.SphereGeometry(0.15, 10, 8), yellow);
+    foot.scale.set(1.05, 0.38, 1.5);
+    foot.position.set(0, -(v.legLen + 0.14) / 2 + 0.02, 0.08);
     leg.add(foot);
     legs.push(leg);
   }
-  // 胸牌
-  const sign = new THREE.Mesh(new THREE.PlaneGeometry(0.3, 0.12), new THREE.MeshStandardMaterial({ color: 0xf3e6c8, roughness: 1 }));
-  sign.position.set(0, 0.42 + v.legLen, 0.46);
-  g.add(sign);
-  const name = new THREE.Mesh(new THREE.PlaneGeometry(0.24, 0.05), new THREE.MeshBasicMaterial({ color: 0x9d2a2a }));
-  name.position.set(0, 0.42 + v.legLen, 0.466);
-  g.add(name);
 
   const shadow = new THREE.Mesh(
-    new THREE.CircleGeometry(0.55, 16),
-    new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.32, depthWrite: false }),
+    new THREE.CircleGeometry(0.58, 18),
+    new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.34, depthWrite: false }),
   );
   shadow.rotation.x = -Math.PI / 2;
   shadow.position.y = 0.012;
   g.add(shadow);
 
   g.scale.setScalar(v.scale);
-  return { group: g, body, belly: bellyMesh, eyes, arms, legs, mouth, shadow, variant: v };
+  return { group: g, body, belly, eyes, arms, legs, mouth, scary, shadow, variant: v };
 }
 
 class Frog {
@@ -287,24 +320,47 @@ class Frog {
   animate(dt, time, speed, dazed) {
     const m = this.model;
     const t = time + this.index * 2.1;
+    const dist = this.distanceToPlayer;
     if (dazed) {
       this.group.rotation.z = Math.sin(t * 8) * 0.12;
       m.body.rotation.y = t * 2;
-      m.eyes.forEach((e, i) => { e.eye.rotation.z = t * 5 * (i ? 1 : -1); });
+      m.eyes.forEach((e, i) => { e.pupil.rotation.z = t * 5 * (i ? 1 : -1); });
+      m.scary.visible = false;
+      m.mouth.visible = true;
       this.group.position.y = this.pos.y + Math.abs(Math.sin(t * 5)) * 0.03;
       return;
     }
     const bob = Math.sin(t * (speed > 0.2 ? 9 : 1.8)) * (speed > 0.2 ? 0.045 : 0.015);
     this.group.position.y = this.pos.y + bob;
     this.group.rotation.z = Math.sin(t * (speed > 0.2 ? 8 : 1.6)) * 0.045;
-    m.body.scale.y = 1 + Math.sin(t * 7) * (speed > 0.2 ? 0.035 : 0.012);
+    const baseY = m.variant.bodyScale[1];
+    m.body.scale.y = baseY * (1 + Math.sin(t * 7) * (speed > 0.2 ? 0.035 : 0.012));
     m.legs[0].rotation.x = Math.sin(t * 9) * 0.35 * Math.min(1, speed * 0.4);
     m.legs[1].rotation.x = -Math.sin(t * 9) * 0.35 * Math.min(1, speed * 0.4);
     m.arms[0].rotation.x = -Math.sin(t * 9) * 0.3 * Math.min(1, speed * 0.4);
     m.arms[1].rotation.x = Math.sin(t * 9) * 0.3 * Math.min(1, speed * 0.4);
+    // 越近越失控：小嘴裂成表情包里的大笑巨口
+    const open = this.state === 'chase' && dist < 10.5;
+    m.scary.visible = open;
+    m.mouth.visible = !open;
+    if (open) {
+      const k = clamp((11 - dist) / 7, 0, 1);
+      m.scary.scale.set(0.8 + 0.35 * k, 0.8 + 0.3 * k, 1);
+      m.scary.position.y = (0.78 + m.variant.legLen) - 0.16;
+      for (const e of m.eyes) {
+        e.pupil.scale.setScalar(1 + 0.16 * k);
+        e.ring.scale.z = 0.42;
+      }
+    } else {
+      for (const e of m.eyes) e.pupil.scale.setScalar(1);
+    }
     if (m.eyes) {
       const blink = (Math.sin(t * 0.7) > 0.985) ? 0.12 : 1;
-      for (const e of m.eyes) e.eye.scale.y = blink;
+      for (const e of m.eyes) {
+        e.ring.scale.y = blink;
+        e.pupil.scale.y = blink;
+        e.highlight.scale.y = blink;
+      }
     }
   }
 

@@ -24,12 +24,12 @@ Harness/model(s), why selected, and material AI help:
 
 Representative AI interaction — one prompt, short response or resulting change, and what we checked before keeping it:
 - **Prompt（给「贴图子代理」的节选）：** “实现 `src/textures.js`：纯 Canvas 2D 程序化贴图，零外部图片；6 个区域（门厅/教室/午睡室/食堂/走廊/出口）的墙、地、顶、墙裙；海报、中文标牌、奶蛙正脸；严格导出 `createTextures()` 与指定 API；每个区域风格统一且温馨惊悚。”
-- **Result：** 生成了约 122 KB（124,870 字节）的 `src/textures.js`（36 张 CanvasTexture）、`tools/texture-preview.html` 预览页与 `docs/TEXTURES.md`；贴图被游戏实际使用（墙纸、棋盘地砖、生日横幅、海报、安全出口牌、奶蛙脸）。
+- **Result：** 生成了约 125 KB（127,568 字节）的 `src/textures.js`（36 张 CanvasTexture）、`tools/texture-preview.html` 预览页与 `docs/TEXTURES.md`；贴图被游戏实际使用（墙纸、棋盘地砖、生日横幅、海报、安全出口牌、奶蛙脸）。
 - **What we checked before keeping it：** 用 102 条契约断言检查 API/尺寸/颜色空间/平铺参数；在 Edge 打开预览页确认 0 console error / 0 pageerror；查看整页与局部截图（墙地接缝、7 张海报、标牌、奶蛙脸）；确认游戏内有兜底贴图 `textures-fallback.js`，即使该模块异常也不会黑屏。检查后保留了这一版，并对过暗的午睡室与出口曝光做了人工调灯。
 
 Outside assets and credits (or None):
 - **Three.js 0.160.0** — MIT License，本地 vendored 于 `vendor/three.module.js`，运行时不访问 CDN。
-- **无其他外部素材。** 所有几何、贴图、灯光、音效、音乐、旁白均由本组使用代码 / Windows 中文 TTS 生成；未使用第三方图片、模型、录音或官方「奶龙 / 奶蛙」版权素材。奶蛙为原创低多边形二创形象，只呼应网络梗的「感觉」。
+- **无其他外部素材。** 所有几何、贴图、灯光、音效、音乐、旁白均由本组使用代码 / Windows 中文 TTS 生成；未使用第三方图片、模型、录音或官方「奶龙 / 奶蛙」版权素材。奶蛙为原创低多边形二创：参考网络「奶蛙」表情包的黄体、绿眼、小嘴与变异大笑，用几何与 Canvas 重建，不复制具体图片。
 - AI 生成的音频与贴图在 `docs/AUDIO.md`、`docs/TEXTURES.md` 中有生成方法与声明。
 
 Known issue (or None):

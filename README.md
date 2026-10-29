@@ -57,6 +57,7 @@ python serve.py 8000
 
 奶蛙：
 - 共 4 只，3 种体型/速度（小奶蛙、胖奶蛙、长腿奶蛙），一直在地图里游荡并追着你。
+- 外观按网络「奶蛙」表情包重做：奶黄色软胶身体、绿色大圆眼、小嘴与奶油色肚皮；靠近时会裂开成一张失控的大笑巨口。
 - 正常行走时它们追不上你，但也甩不掉；**站着不动**或**被堵住**时它们会靠近，贴脸即失败。
 - 冲刺可以把它们甩到「眩晕」状态，暂时失去目标。
 - 靠近时「我是奶龙！我才是奶龙！」会越来越响，心跳与红色暗角也会加重。
@@ -146,7 +147,7 @@ Demo 使用与真人游玩完全相同的场景、HUD、AI、声音与胜负逻�
 ## 8. 素材、依赖与 AI 声明
 
 - **Three.js 0.160.0**：MIT License，本地 `vendor/three.module.js`，运行时不访问 CDN。
-- **所有视觉内容**均为程序化生成：几何体、Canvas 2D 贴图、灯光、特效；没有使用任何外部图片、模型或官方「奶龙 / 奶蛙」素材。奶蛙是本组原创的低多边形二创形象，仅借用网络梗的「感觉」，不复制具体版权角色。
+- **所有视觉内容**均为程序化生成：几何体、Canvas 2D 贴图、灯光、特效；没有使用任何外部图片、模型或官方「奶龙 / 奶蛙」素材。奶蛙是对网络迷因（AI 生成的奶龙变异体）的原创低多边形二创：黄体、绿眼、小嘴与失控大笑均用几何与 Canvas 重建，不复制具体图片或官方角色。
 - **所有音频**为本组原创生成：TTS 旁白/奶蛙台词 + NumPy 合成的音乐/环境/音效。生成方式、参数、AI 声明见 `docs/AUDIO.md`。
 - 代码、贴图、音频、文档在开发过程中使用了 AI 编码代理（DeepSeek Harness / deepseek-v4-1-flash）辅助；所有 AI 产出均经过本地运行、截图或数值自检后保留。详见 `W05_GroupID.md` 的 AI 使用披露。
 - 未使用任何账号、密钥、遥测或远程服务；游戏可离线运行。
@@ -198,9 +199,13 @@ QA 脚本位于 `tools/qa/`，需要 `pnpm install` 安装 playwright-core 并�
 |---|---|
 | ![主菜单](docs/screenshots/menu.jpg) | ![游玩](docs/screenshots/play.jpg) |
 
-| 奶蛙 | 片头剧情 |
+| 奶蛙 · 常态 | 奶蛙 · 靠近时 |
 |---|---|
-| ![奶蛙](docs/screenshots/frog.jpg) | ![剧情](docs/screenshots/story.jpg) |
+| ![奶蛙](docs/screenshots/frog.jpg) | ![奶蛙大笑](docs/screenshots/frog-scary.jpg) |
+
+| 片头剧情 | 被抓 Jumpscare |
+|---|---|
+| ![剧情](docs/screenshots/story.jpg) | ![Jumpscare](docs/screenshots/jumpscare.jpg) |
 
 > 截图来自本地 Edge + Playwright 自动捕获，实际画面会随光照与分辨率略有差异。
 
