@@ -11,7 +11,7 @@ import sys
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 OUT = os.path.join(ROOT, "release", "w05_3d_game")
 
-FILES = ["index.html", "styles.css", "serve.py", "run_game.bat", "package.json", "pnpm-lock.yaml", "README.md"]
+FILES = ["index.html", "styles.css", "serve.py", "run_game.bat", "package.json", "pnpm-lock.yaml", "README.md", "HANDOFF.md"]
 DIRS = ["src", "vendor", "assets"]
 
 def main():
