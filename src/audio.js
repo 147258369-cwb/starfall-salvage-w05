@@ -6,6 +6,7 @@ const FALLBACK_DURATION = {
   vo_01: 4.2, vo_02: 4.0, vo_03: 5.6, vo_04: 6.4, vo_05: 5.2, vo_06: 3.4,
   sfx_click: 0.12, sfx_start_sting: 4, sfx_pickup: 0.9, sfx_unlock_map: 2.4,
   sfx_unlock_speed: 2.4, sfx_exit_open: 3, sfx_win: 7, sfx_lose: 5.5,
+  nailong_catch: 4.5,
   sfx_screech: 2, sfx_footstep_1: 0.3, sfx_footstep_2: 0.3, sfx_sprint: 0.8,
   sfx_frog_alert: 1.2, sfx_ui_hover: 0.1,
 };
@@ -23,6 +24,7 @@ export class AudioManager {
     this.hasFiles = false;
     this.music = null;
     this.musicKey = null;
+    this.activeSfx = new Set();
     this.voice = null;
     this.frogs = [];
     this.heartbeat = null;
@@ -189,7 +191,20 @@ export class AudioManager {
     src.playbackRate.value = rate;
     const g = this._gainNode(gain, pan);
     src.connect(g);
+    const handle = { src, gain: g, key };
+    this.activeSfx.add(handle);
+    const remove = () => this.activeSfx.delete(handle);
+    src.onended = remove;
     src.start(this.ctx.currentTime + delay);
+  }
+
+  stopSfx(key = null) {
+    for (const handle of this.activeSfx) {
+      if (key && handle.key !== key) continue;
+      try { handle.src.stop(); } catch (e) { /* already ended */ }
+      try { handle.gain.disconnect(); } catch (e) { /* ignore */ }
+      this.activeSfx.delete(handle);
+    }
   }
 
   synthSfx(key, gain = 1) {

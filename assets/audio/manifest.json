@@ -187,6 +187,14 @@
       "duration": 5.0,
       "desc": "被抓：低频下坠 + FM 尖啸 + 残余呼吸"
     },
+    "nailong_catch": {
+      "file": "assets/audio/nai_long.mp3",
+      "kind": "sfx",
+      "loop": false,
+      "gain": 1.0,
+      "duration": 4.5,
+      "desc": "被奶龙抓到时播放的奶龙音效（用户提供素材）"
+    },
     "sfx_screech": {
       "file": "assets/audio/sfx_screech.wav",
       "kind": "sfx",

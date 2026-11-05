@@ -351,7 +351,11 @@ class Game {
     this.player.lookEnabled = false;
     this.player.frozen = false;
     if (document.pointerLockElement) document.exitPointerLock();
-    this.audio.stopAll();
+    this.audio.stopMusic(0.4);
+    this.audio.stopVoice();
+    this.audio.setHeartbeat(0);
+    for (let i = 0; i < this.frogs.frogs.length; i++) this.audio.setFrogVoice(i, { gain: 0 });
+    this.audio.stopSfx();
     this.audio.playMusic('music_menu', { fade: 1.6 });
     this.ui.hidePause();
     this.ui.hideResults();
@@ -488,7 +492,7 @@ class Game {
     this.player.addShake(1.1);
     this.audio.stopMusic(0.5);
     this.audio.playSfx('sfx_screech', { gain: 1 });
-    this.audio.playSfx('sfx_lose', { gain: 0.9, delay: 0.4 });
+    this.audio.playSfx('nailong_catch', { gain: 1.0, delay: 0.4 });
     this.ui.flash();
     this.ui.setDanger(1);
     this.ui.showSubtitle('奶蛙', '找到你了。', { frog: true, duration: 2.6 });
@@ -499,7 +503,10 @@ class Game {
       this.state = 'lose';
       this.jumpscareEl?.classList.add('hidden');
       this.ui.showLose();
-      this.audio.stopAll();
+      this.audio.stopMusic(0.4);
+    this.audio.stopVoice();
+    this.audio.setHeartbeat(0);
+    for (let i = 0; i < this.frogs.frogs.length; i++) this.audio.setFrogVoice(i, { gain: 0 });
     }, 2400);
   }
 
@@ -511,7 +518,10 @@ class Game {
     this.player.bot = null;
     this.demo.stop();
     if (document.pointerLockElement) document.exitPointerLock();
-    this.audio.stopAll();
+    this.audio.stopMusic(0.4);
+    this.audio.stopVoice();
+    this.audio.setHeartbeat(0);
+    for (let i = 0; i < this.frogs.frogs.length; i++) this.audio.setFrogVoice(i, { gain: 0 });
     this.audio.playSfx(isDemo ? 'sfx_win' : 'sfx_win', { gain: 0.9 });
     this.ui.flash();
     await this.ui.fadeOut(1500);
