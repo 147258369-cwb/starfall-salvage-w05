@@ -1,0 +1,126 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<title>奶蛙外观预览 · Frog Look Preview</title>
+<style>
+  html,body{margin:0;padding:0;background:#100b0c;color:#ddd;font:13px/1.5 system-ui,Segoe UI,sans-serif;height:100%}
+  #wrap{display:flex;flex-direction:column;height:100%}
+  header{padding:10px 16px;background:#1a1213;border-bottom:1px solid #332}
+  header b{color:#f6dc5a}
+  #views{flex:1;display:grid;grid-template-columns:repeat(2,1fr);grid-auto-rows:1fr}
+  .view{position:relative;border:1px solid #2a2020;min-height:220px}
+  .view canvas{width:100%;height:100%;display:block}
+  .tag{position:absolute;top:8px;left:10px;background:rgba(0,0,0,.55);padding:2px 8px;border-radius:4px;font-size:12px;color:#f6dc5a}
+  #status{position:fixed;bottom:10px;left:50%;transform:translateX(-50%);background:rgba(0,0,0,.7);padding:6px 14px;border-radius:6px;font-size:12px;color:#9f9}
+</style>
+<script type="importmap">
+{ "imports": { "three": "../vendor/three.module.js" } }
+</script>
+</head>
+<body>
+<div id="wrap">
+  <header><b>奶蛙外观预览</b> · GLB 模型 + 程序化裂口 · 左闭口 / 右裂口（靠近时）</header>
+  <div id="views"></div>
+</div>
+<div id="status">加载中……</div>
+
+<script type="module">
+import * as THREE from 'three';
+import { buildFrogModel, loadFrogModelTemplate } from '../src/frogs.js';
+
+const container = document.getElementById('views');
+const status = document.getElementById('status');
+
+// 四种展示：变种 × 闭口/裂口
+const items = [
+  { variant: 'small', open: false, label: 'small · 闭口' },
+  { variant: 'small', open: true, label: 'small · 裂口(靠近)' },
+  { variant: 'tall', open: false, label: 'tall · 闭口' },
+  { variant: 'fat', open: true, label: 'fat · 裂口(靠近)' },
+];
+
+const renderers = [];
+function makeView(it) {
+  const div = document.createElement('div');
+  div.className = 'view';
+  const tag = document.createElement('div');
+  tag.className = 'tag';
+  tag.textContent = it.label;
+  div.appendChild(tag);
+  container.appendChild(div);
+
+  const renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
+  renderer.setPixelRatio(window.devicePixelRatio || 1);
+  renderer.setClearColor(0x100b0c, 1);
+  div.appendChild(renderer.domElement);
+
+  const scene = new THREE.Scene();
+  const camera = new THREE.PerspectiveCamera(45, 1, 0.1, 100);
+  camera.position.set(0.9, 1.4, 3.6);
+  camera.lookAt(0, 0.85, 0);
+
+  scene.add(new THREE.HemisphereLight(0xfff4e0, 0x201812, 0.9));
+  const dir = new THREE.DirectionalLight(0xfff0d0, 1.3);
+  dir.position.set(2.2, 3.5, 2.8);
+  scene.add(dir);
+  const back = new THREE.DirectionalLight(0x8090ff, 0.25);
+  back.position.set(-2, 1.5, -2);
+  scene.add(back);
+
+  const grid = new THREE.GridHelper(6, 12, 0x443333, 0x2a2020);
+  scene.add(grid);
+
+  const group = new THREE.Group();
+  scene.add(group);
+  renderers.push({ renderer, scene, camera, group });
+  return group;
+}
+
+function resize() {
+  renderers.forEach(({ renderer, camera }) => {
+    const c = renderer.domElement;
+    const w = c.clientWidth || 300, h = c.clientHeight || 300;
+    if (c.width !== w || c.height !== h) {
+      renderer.setSize(w, h, false);
+      camera.aspect = w / h;
+      camera.updateProjectionMatrix();
+    }
+  });
+}
+window.addEventListener('resize', resize);
+
+async function init() {
+  const template = await loadFrogModelTemplate();
+  status.textContent = '模板' + (template ? '加载成功' : '加载失败(回退程序化)');
+  items.forEach((it) => {
+    const group = makeView(it);
+    const m = buildFrogModel(it.variant, template);
+    group.add(m.group);
+    if (it.open) {
+      // 强制显示裂口并放大到接近时的大小
+      m.scary.visible = true;
+      const k = 0.85;
+      if (m.modelBased) {
+        const s = m.scaryBaseScale * (0.9 + 0.4 * k);
+        m.scary.scale.set(s, s, s);
+        m.scary.position.y = m.scaryBaseY - 0.05 * k;
+      } else {
+        m.scary.scale.set(0.8 + 0.35 * k, 0.8 + 0.3 * k, 1);
+        m.scary.position.y = m.scaryBaseY;
+      }
+      if (m.mouth) m.mouth.visible = false;
+    }
+  });
+  resize();
+  const loop = () => {
+    resize();
+    renderers.forEach(({ renderer, scene, camera }) => renderer.render(scene, camera));
+    requestAnimationFrame(loop);
+  };
+  loop();
+}
+init();
+</script>
+</body>
+</html>

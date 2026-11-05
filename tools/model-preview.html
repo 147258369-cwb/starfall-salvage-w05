@@ -1,0 +1,157 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<title>奶龙 GLB 模型预览 · Model Preview</title>
+<style>
+  html,body{margin:0;padding:0;background:#111;color:#ddd;font:13px/1.5 system-ui,Segoe UI,sans-serif;height:100%}
+  #wrap{display:flex;flex-direction:column;height:100%}
+  header{padding:10px 16px;background:#1a1a1a;border-bottom:1px solid #333}
+  header b{color:#f6dc5a}
+  #views{flex:1;display:grid;grid-template-columns:repeat(2,1fr);grid-auto-rows:1fr}
+  .view{position:relative;border:1px solid #2a2a2a;min-height:220px}
+  .view canvas{width:100%;height:100%;display:block}
+  .tag{position:absolute;top:8px;left:10px;background:rgba(0,0,0,.55);padding:2px 8px;border-radius:4px;font-size:12px;color:#f6dc5a}
+  #status{position:fixed;bottom:10px;left:50%;transform:translateX(-50%);background:rgba(0,0,0,.7);padding:6px 14px;border-radius:6px;font-size:12px;color:#9f9}
+}
+</style>
+<script type="importmap">
+{ "imports": { "three": "../vendor/three.module.js" } }
+</script>
+</head>
+<body>
+<div id="wrap">
+  <header><b>奶龙 GLB 模型预览</b> · nailong_colored_2.0.glb · 四个朝向（前/后/左/右）· 底部网格为地面</header>
+  <div id="views"></div>
+</div>
+<div id="status">加载中……</div>
+
+<script type="module">
+import * as THREE from 'three';
+import { GLTFLoader } from '../vendor/three/loaders/GLTFLoader.js';
+
+const container = document.getElementById('views');
+const status = document.getElementById('status');
+
+const angles = [
+  { name: '正面 (+Z 朝相机)', theta: 0 },
+  { name: '背面 (-Z 朝相机)', theta: Math.PI },
+  { name: '左侧 (+X 朝相机)', theta: Math.PI / 2 },
+  { name: '右侧 (-X 朝相机)', theta: -Math.PI / 2 },
+];
+
+const renderers = [];
+function makeView(def) {
+  const div = document.createElement('div');
+  div.className = 'view';
+  const tag = document.createElement('div');
+  tag.className = 'tag';
+  tag.textContent = def.name;
+  div.appendChild(tag);
+  container.appendChild(div);
+
+  const renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
+  renderer.setPixelRatio(window.devicePixelRatio || 1);
+  renderer.setClearColor(0x111111, 1);
+  renderer.shadowMap.enabled = true;
+  div.appendChild(renderer.domElement);
+
+  const scene = new THREE.Scene();
+  const camera = new THREE.PerspectiveCamera(45, 1, 0.1, 100);
+  // 相机在 +Z 方向看向原点
+  camera.position.set(0, 1.1, 4.2);
+  camera.lookAt(0, 0.9, 0);
+
+  scene.add(new THREE.HemisphereLight(0xffffff, 0x333333, 1.1));
+  const dir = new THREE.DirectionalLight(0xffffff, 1.4);
+  dir.position.set(2.5, 4, 3);
+  dir.castShadow = true;
+  scene.add(dir);
+
+  const grid = new THREE.GridHelper(6, 12, 0x555555, 0x333333);
+  scene.add(grid);
+  // 地面浅色圆盘，便于看投影
+  const ground = new THREE.Mesh(
+    new THREE.CircleGeometry(2.2, 40),
+    new THREE.MeshStandardMaterial({ color: 0x1c1c1c, roughness: 1 })
+  );
+  ground.rotation.x = -Math.PI / 2;
+  ground.position.y = -0.001;
+  ground.receiveShadow = true;
+  scene.add(ground);
+
+  const group = new THREE.Group();
+  scene.add(group);
+  // 用 yaw 旋转模型，模拟从对应方向观察
+  group.rotation.y = def.theta;
+
+  const size = new THREE.Vector3();
+  renderers.push({ renderer, scene, camera, group, size });
+  return { renderer, scene, camera, group, size };
+}
+
+const views = angles.map(makeView);
+
+function resize() {
+  views.forEach(({ renderer, camera }) => {
+    const c = renderer.domElement;
+    const w = c.clientWidth || 300, h = c.clientHeight || 300;
+    if (c.width !== w || c.height !== h) {
+      renderer.setSize(w, h, false);
+      camera.aspect = w / h;
+      camera.updateProjectionMatrix();
+    }
+  });
+}
+window.addEventListener('resize', resize);
+
+const loader = new GLTFLoader();
+loader.load('../assets/models/nailong_colored_2.0.glb', (gltf) => {
+  const root = gltf.scene;
+  // 自动归一化：让模型底部贴地 y=0，身高到 1.6，居中
+  const box = new THREE.Box3().setFromObject(root);
+  const size = new THREE.Vector3();
+  box.getSize(size);
+  const center = new THREE.Vector3();
+  box.getCenter(center);
+  const scale = 1.6 / size.y;
+  root.scale.setScalar(scale);
+  // 重新计算包围盒，贴地+居中
+  const box2 = new THREE.Box3().setFromObject(root);
+  const c2 = new THREE.Vector3();
+  box2.getCenter(c2);
+  root.position.x -= c2.x;
+  root.position.z -= c2.z;
+  root.position.y -= box2.min.y;
+
+  root.traverse((o) => {
+    if (o.isMesh) {
+      o.castShadow = true; o.receiveShadow = true;
+      const mats = Array.isArray(o.material) ? o.material : [o.material];
+      for (const m of mats) {
+        // 修复：黄色被导进了 COLOR_1（琥珀橙），材质名 'yellow' 的 baseColor 是白色
+        if (m && m.name === 'yellow') m.color.setRGB(0.9946, 0.5286, 0.2952);
+      }
+    }
+  });
+
+  views.forEach(({ group }) => group.add(root.clone()));
+  status.textContent = '加载完成 · 尺寸(归一化) ' + size.x.toFixed(2) + ' × ' + size.y.toFixed(2) + ' × ' + size.z.toFixed(2) + ' · 缩放 x' + scale.toFixed(3);
+  resize();
+  const loop = () => {
+    resize();
+    views.forEach(({ renderer, scene, camera }) => renderer.render(scene, camera));
+    requestAnimationFrame(loop);
+  };
+  loop();
+}, (ev) => {
+  if (ev.total) status.textContent = '加载中 ' + Math.round(ev.loaded / ev.total * 100) + '%';
+}, (err) => {
+  status.textContent = '加载失败: ' + err;
+  console.error(err);
+});
+
+resize();
+</script>
+</body>
+</html>

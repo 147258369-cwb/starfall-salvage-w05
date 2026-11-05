@@ -16,6 +16,16 @@
 
 ---
 
+## 0.5 最近一次迭代：奶蛙身体换成 GLB 模型（2026-11-05）
+
+- **改动：** 奶蛙身体从程序化低多边形几何体换成组员提供的 **`assets/models/nailong_colored_2.0.glb`**（原创奶龙模型，单网格 4 材质分组、无骨骼无动画）；新增本地 vendored 的 `vendor/three/loaders/GLTFLoader.js` 与 `vendor/three/utils/BufferGeometryUtils.js`（MIT，离线可用）。
+- **关键处理：** ① 模型朝向修正（原脸朝 -Z，转 180° 与游戏内奶蛙朝向一致）；② 颜色修正（模型颜色被 Blender 导出到非标准 `COLOR_1` 通道，GLTFLoader 读标准 `COLOR_0` 会变白，加载后给 `yellow` 材质补回奶黄色）；③ 加轻微自发光，保证黑暗场景可见；④ 保留程序化「靠近时裂开的大笑巨口」+ 影子（模型无骨骼不能自己张嘴，这是核心惊吓机制）；⑤ 动画改为整体摇摆/呼吸/颠簸。
+- **回退保障：** `src/frogs.js` 的 `loadFrogModelTemplate()` 加载失败时自动回退程序化奶蛙，游戏不黑屏。
+- **验证：** 本地 Edge/Chrome headless（CDP）加载游戏，0 console error / 0 pageerror；奶蛙模型在黑暗场景中正常渲染、靠近危险暗角生效；预览页 `tools/model-preview.html`（模型四视角）与 `tools/frog-look-preview.html`（闭口/裂口对比）可用。
+- **已知限制：** 模型为静态网格，无四肢摆动/眨眼动画；若需走路动画或更贴合参考图，改 `src/frogs.js` 的 `buildFrogModel` 与 `loadFrogModelTemplate`。
+
+---
+
 ## 1. 当前状态（TL;DR）
 
 | 项 | 状态 |
@@ -191,7 +201,7 @@ python tools/package_submission.py
 |---|---|
 | 地图房间/门/奶片位置 | src/config.js 的 ROOMS/CORRIDORS/DOORS/CANDY_CELLS |
 | 奶蛙数量/出生点/变种 | src/config.js 的 FROG_DEFS，src/frogs.js 的 VARIANTS |
-| 奶蛙外观/表情 | src/frogs.js 的 buildFrogModel |
+| 奶蛙外观/表情 | src/frogs.js 的 buildFrogModel（GLB 模式）；模型文件 assets/models/nailong_colored_2.0.glb；加载/颜色/朝向在 loadFrogModelTemplate |
 | 追逐距离/速度/眩晕 | src/frogs.js 的 Frog.update；src/config.js 的 PLAYER |
 | 解锁阈值/目标 | src/config.js 的 UNLOCK_MAP_AT/UNLOCK_SPEED_AT/TOTAL_CANDIES |
 | 片头文本/镜头 | src/config.js 的 STORY/STORY_PATH，src/story.js |

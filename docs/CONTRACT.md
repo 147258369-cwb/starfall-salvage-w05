@@ -12,8 +12,16 @@
 
 ## 技术栈
 - Three.js **0.160.0**，本地 vendored：`vendor/three.module.js`（importmap `three`）。禁止 CDN / 运行时外网依赖。
+- **GLTFLoader / BufferGeometryUtils（three r160 示例模块）** 本地 vendored 于 `vendor/three/`，用于加载奶蛙 GLB 模型；同样禁止 CDN。
 - 纯 ES Module，无构建步骤；通过 `python serve.py 8000` 以 http:// 打开。
-- 所有素材必须原创或由本组用程序生成（TTS/合成音频、canvas 贴图、几何体建模）。禁止使用他人版权图片/音频（包括真正的奶龙官方形象；奶蛙是我们自己的低多边形二创）。
+- 所有素材必须原创或由本组用程序生成（TTS/合成音频、canvas 贴图、几何体建模），或为组员提供的原创几何模型（奶蛙身体 `assets/models/nailong_colored_2.0.glb`）。禁止使用他人版权图片/音频/模型（包括真正的奶龙官方形象）。
+
+## 奶蛙模型契约（frogs.js）
+- `loadFrogModelTemplate()`（`src/frogs.js`）：一次性预加载 `assets/models/nailong_colored_2.0.glb`，返回 Promise<THREE.Group|null>；内部完成颜色/朝向/自发光修正与归一化（脚底贴地、身高 1.5、面朝 +Z）；失败返回 null（回退程序化奶蛙）。
+- `buildFrogModel(variant, modelTemplate)`：传入模型模板则用 GLB 身体 + 程序化裂口巨口 + 影子；否则回退原有程序化低多边形奶蛙。
+- `FrogManager(world, player, audio, modelTemplate)` / `new Frog(def, index, world, player, audio, modelTemplate)`：接收模型模板。
+- 模型为静态网格（无骨骼/无动画），动画走 `Frog.animate` 的整体摇摆/呼吸/颠簸分支（`model.modelBased`）。
+- 颜色：模型 `yellow` 材质补奶黄色 `#f4d64a`（原颜色被导出到非标准 COLOR_1 通道），其余材质（绿眼/黑瞳/暗嘴）由 baseColorFactor 提供；所有材质加轻微自发光保证黑暗可见。
 
 ## 视觉基调
 - 温馨：奶油黄 #ffd9a0、粉 #f7b6c2、薄荷 #a9d6c4、木色 #b07a4a。

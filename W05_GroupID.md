@@ -29,12 +29,15 @@ Representative AI interaction — one prompt, short response or resulting change
 
 Outside assets and credits (or None):
 - **Three.js 0.160.0** — MIT License，本地 vendored 于 `vendor/three.module.js`，运行时不访问 CDN。
-- **无其他外部素材。** 所有几何、贴图、灯光、音效、音乐、旁白均由本组使用代码 / Windows 中文 TTS 生成；未使用第三方图片、模型、录音或官方「奶龙 / 奶蛙」版权素材。奶蛙为原创低多边形二创：参考网络「奶蛙」表情包的黄体、绿眼、小嘴与变异大笑，用几何与 Canvas 重建，不复制具体图片。
+- **GLTFLoader / BufferGeometryUtils（three r160 示例模块）** — MIT License，本地 `vendor/three/`，不访问 CDN；用于加载奶蛙 GLB 模型。
+- **奶蛙身体 3D 模型 `assets/models/nailong_colored_2.0.glb`** — 组员提供的原创低多边形奶龙模型（无骨骼、无动画、单网格 4 材质分组、纯色无贴图），非官方「奶龙/奶蛙」素材，不涉及第三方版权；靠近时的失控大笑巨口用程序化几何重建。
+- **无其他外部素材。** 所有几何、贴图、灯光、音效、音乐、旁白均由本组使用代码 / Windows 中文 TTS 生成；未使用第三方图片、模型、录音或官方「奶龙 / 奶蛙」版权素材。
 - AI 生成的音频与贴图在 `docs/AUDIO.md`、`docs/TEXTURES.md` 中有生成方法与声明。
 
 Known issue (or None):
 - 本仓库完成时**尚未进行**作业要求的真人外部试玩与 5 分钟演示视频；报告中的 NO AI 章节尚未填写。
 - 本关只实现「地图 + 加速」两种道具，未实现震荡/磁铁；仅支持桌面键鼠，无移动端。
+- 奶蛙身体为静态 GLB 模型（无骨骼/无动画），走路以整体摇摆/呼吸/颠簸表现，无独立四肢摆动与眨眼；若模型加载失败自动回退程序化奶蛙。
 - AI 生成的旁白/奶蛙音效尚未由组员人耳终审；软件渲染/低端 GPU 下帧率较低。
 - 本地 Windows 的 TTS 中文语音会把 SSML 音高量化，语速只能落在固定档位（见 `docs/AUDIO.md`）。
 - 自动化验收环境：Windows + **Microsoft Edge (Chromium) 155.0.4283.62 headless + Playwright Core 1.64.1**，1440×900 / 1280×720 / 1920×1080；Chrome / Edge 桌面版预期可用，Firefox / Safari 未测。

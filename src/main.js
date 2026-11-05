@@ -6,7 +6,7 @@ import {
 } from './config.js';
 import { World } from './world.js';
 import { Player } from './player.js';
-import { FrogManager } from './frogs.js';
+import { FrogManager, loadFrogModelTemplate } from './frogs.js';
 import { AudioManager } from './audio.js';
 import { UI } from './ui.js';
 import { Story } from './story.js';
@@ -135,7 +135,11 @@ class Game {
     this.player.onFootstep = (i, sprint) => {
       this.audio.playSfx('sfx_footstep_' + (i + 1), { gain: sprint ? 0.6 : 0.42, rate: 0.92 + Math.random() * 0.16 });
     };
-    this.frogs = new FrogManager(this.world, this.player, this.audio);
+    // 预加载奶龙 GLB 模型（失败则回退程序化奶蛙）
+    let frogTemplate = null;
+    this.ui.setLoading(0.42, '正在给奶蛙换上新装……');
+    try { frogTemplate = await loadFrogModelTemplate(); } catch (e) { console.warn('[frog] 模型预加载失败', e); }
+    this.frogs = new FrogManager(this.world, this.player, this.audio, frogTemplate);
     this.frogs.onCatch = (f) => this.onCaught(f);
     this.frogs.onNearLine = (line) => {
       if (this.state === 'playing' || this.state === 'demo') {

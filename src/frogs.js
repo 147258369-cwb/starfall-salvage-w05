@@ -1,10 +1,70 @@
 // 奶蛙：低多边形模型、流场追逐、贴近失败、加速甩脱、距离音效
 import * as THREE from 'three';
 import { FROG_DEFS, FROG_LINES, cellCenter, GRID } from './config.js';
+import { GLTFLoader } from '../vendor/three/loaders/GLTFLoader.js';
 
 const C = GRID.cell;
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 const damp = (a, b, l, dt) => b + (a - b) * Math.exp(-l * dt);
+
+// ============ 奶龙 GLB 模型预加载 ============
+// 用户提供的 nailong_colored_2.0.glb：单个静态网格、4 材质分组、无骨骼无动画。
+// 实际颜色被 Blender 导进 COLOR_1（琥珀 0.99/0.53/0.30），COLOR_0 是全白，所以
+// 加载后给材质名 'yellow' 的补上本色，并加自发光保证黑暗场景可见。
+// 归一化：脚底贴地 y=0、身高 1.5、x/z 居中、正面朝 +Z（与程序化奶蛙一致）。
+let _frogTemplatePromise = null;
+export function loadFrogModelTemplate() {
+  if (!_frogTemplatePromise) {
+    _frogTemplatePromise = new Promise((resolve) => {
+      const loader = new GLTFLoader();
+      // 相对模块文件解析，确保在根目录游戏和 tools/ 预览页都能正确加载
+      const modelUrl = new URL('../assets/models/nailong_colored_2.0.glb', import.meta.url).href;
+      loader.load(
+        modelUrl,
+        (gltf) => {
+          try {
+            const root = gltf.scene;
+            root.traverse((o) => {
+              if (o.isMesh) {
+                const mats = Array.isArray(o.material) ? o.material : [o.material];
+                for (const m of mats) {
+                  if (!m) continue;
+                  const isBody = m.name === 'yellow';
+                  if (isBody) m.color.setHex(0xf4d64a);
+                  m.emissive = new THREE.Color(isBody ? 0x3a2a05 : 0x0a0a05);
+                  m.emissiveIntensity = isBody ? 0.3 : 0.18;
+                }
+              }
+            });
+            const box = new THREE.Box3().setFromObject(root);
+            const size = new THREE.Vector3();
+            box.getSize(size);
+            const scale = 1.5 / size.y;
+            root.scale.setScalar(scale);
+            const box2 = new THREE.Box3().setFromObject(root);
+            const c2 = new THREE.Vector3();
+            box2.getCenter(c2);
+            root.position.x -= c2.x;
+            root.position.z -= c2.z;
+            root.position.y -= box2.min.y;
+            // 模型脸朝 -Z，转 180° 让脸朝 +Z，与游戏内奶蛙朝向一致
+            root.rotation.y = Math.PI;
+            resolve(root);
+          } catch (e) {
+            console.warn('[frog-model] 归一化失败，回退程序化奶蛙', e);
+            resolve(null);
+          }
+        },
+        undefined,
+        (err) => {
+          console.warn('[frog-model] 模型加载失败，回退程序化奶蛙', err);
+          resolve(null);
+        }
+      );
+    });
+  }
+  return _frogTemplatePromise;
+}
 
 // 奶蛙 = 奶龙的 AI 变异体：黄色软胶身体、绿色圆眼、极小嘴；
 // 参考网络「奶蛙」表情包，不使用官方奶龙素材。靠近时裂开成大笑巨口。
@@ -14,17 +74,79 @@ const VARIANTS = {
   tall:  { bodyColor: 0xf6dc5a, scale: 1.0, bodyScale: [0.9, 1.34, 0.92], eyeR: 0.19, legLen: 0.55, speed: 4.35, radius: 0.5, seed: 3 },
 };
 
-function buildFrogModel(variant) {
+function buildScaryJaws() {
+  const black = new THREE.MeshStandardMaterial({ color: 0x0a0906, roughness: 0.12 });
+  const toothMat = new THREE.MeshStandardMaterial({ color: 0xf3ead2, roughness: 0.35 });
+  const tongueMat = new THREE.MeshStandardMaterial({ color: 0xb9545c, roughness: 0.6 });
+  const scary = new THREE.Group();
+  const cavity = new THREE.Mesh(new THREE.SphereGeometry(0.27, 20, 16), black);
+  cavity.scale.set(1.18, 0.9, 0.22);
+  scary.add(cavity);
+  for (let i = 0; i < 5; i++) {
+    const tooth = new THREE.Mesh(new THREE.BoxGeometry(0.055, 0.07, 0.02), toothMat);
+    tooth.position.set(-0.16 + i * 0.08, 0.16, 0.055);
+    scary.add(tooth);
+  }
+  for (let i = 0; i < 4; i++) {
+    const tooth = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.055, 0.02), toothMat);
+    tooth.position.set(-0.12 + i * 0.08, -0.16, 0.055);
+    scary.add(tooth);
+  }
+  const tongue = new THREE.Mesh(new THREE.SphereGeometry(0.16, 12, 10), tongueMat);
+  tongue.scale.set(1, 0.5, 0.25);
+  tongue.position.set(0, -0.07, 0.06);
+  scary.add(tongue);
+  scary.visible = false;
+  return scary;
+}
+
+function buildFrogShadow() {
+  const shadow = new THREE.Mesh(
+    new THREE.CircleGeometry(0.58, 18),
+    new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.34, depthWrite: false }),
+  );
+  shadow.rotation.x = -Math.PI / 2;
+  shadow.position.y = 0.012;
+  return shadow;
+}
+
+export function buildFrogModel(variant, modelTemplate) {
   const v = VARIANTS[variant];
   const g = new THREE.Group();
+
+  // ===== GLB 模型分支：用户提供的奶龙模型作为身体，保留程序化裂口+影子 =====
+  if (modelTemplate) {
+    const holder = new THREE.Group();
+    const body = modelTemplate.clone(true);
+    holder.add(body);
+    g.add(holder);
+
+    const scary = buildScaryJaws();
+    // 归一化身高 1.5、脚底贴地、正面朝 +Z；脸部在上部，裂口贴到脸前
+    const scaryBaseScale = 1.1;
+    scary.position.set(0, 1.18, 0.28);
+    scary.scale.setScalar(scaryBaseScale);
+    g.add(scary);
+
+    const shadow = buildFrogShadow();
+    shadow.scale.setScalar(1.15);
+    g.add(shadow);
+
+    g.scale.setScalar(v.scale);
+    return {
+      group: g, body: holder, belly: null, eyes: [], arms: [], legs: [],
+      mouth: null, scary, shadow, variant: v, modelBased: true,
+      scaryBaseScale, scaryBaseY: 1.18,
+    };
+  }
+
+  // ===== 程序化分支（兜底）：原有低多边形奶蛙 =====
   const yellow = new THREE.MeshStandardMaterial({ color: v.bodyColor, roughness: 0.38, metalness: 0.02, emissive: 0x3a2a05, emissiveIntensity: 0.12 });
   const bellyMat = new THREE.MeshStandardMaterial({ color: 0xf7e9b6, roughness: 0.5 });
   const irisMat = new THREE.MeshStandardMaterial({ color: 0x6f963c, roughness: 0.45, emissive: 0x1c2a08, emissiveIntensity: 0.4 });
   const black = new THREE.MeshStandardMaterial({ color: 0x0a0906, roughness: 0.12 });
   const shine = new THREE.MeshBasicMaterial({ color: 0xfff8e0 });
   const mouthMat = new THREE.MeshStandardMaterial({ color: 0x3a1a12, roughness: 0.7 });
-  const toothMat = new THREE.MeshStandardMaterial({ color: 0xf3ead2, roughness: 0.35 });
-  const tongueMat = new THREE.MeshStandardMaterial({ color: 0xb9545c, roughness: 0.6 });
 
   const bodyY = 0.78 + v.legLen;
   const body = new THREE.Mesh(new THREE.SphereGeometry(0.62, 24, 20), yellow);
@@ -67,27 +189,10 @@ function buildFrogModel(variant) {
     g.add(nose);
   }
 
-  // 靠近/追逐时才裂开的大笑巨口（参考表情包里失控的奶蛙）
-  const scary = new THREE.Group();
-  scary.position.set(0, bodyY - 0.16, 0.625);
-  const cavity = new THREE.Mesh(new THREE.SphereGeometry(0.27, 20, 16), black);
-  cavity.scale.set(1.18, 0.9, 0.22);
-  scary.add(cavity);
-  for (let i = 0; i < 5; i++) {
-    const tooth = new THREE.Mesh(new THREE.BoxGeometry(0.055, 0.07, 0.02), toothMat);
-    tooth.position.set(-0.16 + i * 0.08, 0.16, 0.055);
-    scary.add(tooth);
-  }
-  for (let i = 0; i < 4; i++) {
-    const tooth = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.055, 0.02), toothMat);
-    tooth.position.set(-0.12 + i * 0.08, -0.16, 0.055);
-    scary.add(tooth);
-  }
-  const tongue = new THREE.Mesh(new THREE.SphereGeometry(0.16, 12, 10), tongueMat);
-  tongue.scale.set(1, 0.5, 0.25);
-  tongue.position.set(0, -0.07, 0.06);
-  scary.add(tongue);
-  scary.visible = false;
+  const scary = buildScaryJaws();
+  const scaryBaseScale = 1;
+  const scaryBaseY = bodyY - 0.16;
+  scary.position.set(0, scaryBaseY, 0.625);
   g.add(scary);
 
   // 短手（带小手指）
@@ -120,27 +225,25 @@ function buildFrogModel(variant) {
     legs.push(leg);
   }
 
-  const shadow = new THREE.Mesh(
-    new THREE.CircleGeometry(0.58, 18),
-    new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.34, depthWrite: false }),
-  );
-  shadow.rotation.x = -Math.PI / 2;
-  shadow.position.y = 0.012;
+  const shadow = buildFrogShadow();
   g.add(shadow);
 
   g.scale.setScalar(v.scale);
-  return { group: g, body, belly, eyes, arms, legs, mouth, scary, shadow, variant: v };
+  return {
+    group: g, body, belly, eyes, arms, legs, mouth, scary, shadow, variant: v,
+    modelBased: false, scaryBaseScale, scaryBaseY,
+  };
 }
 
 class Frog {
-  constructor(def, index, world, player, audio) {
+  constructor(def, index, world, player, audio, modelTemplate) {
     this.def = def;
     this.index = index;
     this.world = world;
     this.player = player;
     this.audio = audio;
     this.variant = VARIANTS[def.variant];
-    this.model = buildFrogModel(def.variant);
+    this.model = buildFrogModel(def.variant, modelTemplate);
     this.group = this.model.group;
     this.pos = new THREE.Vector3();
     this.vel = new THREE.Vector3();
@@ -321,38 +424,53 @@ class Frog {
     const m = this.model;
     const t = time + this.index * 2.1;
     const dist = this.distanceToPlayer;
+    const walk = speed > 0.2;
     if (dazed) {
       this.group.rotation.z = Math.sin(t * 8) * 0.12;
-      m.body.rotation.y = t * 2;
-      m.eyes.forEach((e, i) => { e.pupil.rotation.z = t * 5 * (i ? 1 : -1); });
+      if (m.modelBased) m.body.rotation.z = Math.sin(t * 5) * 0.18;
+      else m.body.rotation.y = t * 2;
+      if (m.eyes) m.eyes.forEach((e, i) => { e.pupil.rotation.z = t * 5 * (i ? 1 : -1); });
       m.scary.visible = false;
-      m.mouth.visible = true;
+      if (m.mouth) m.mouth.visible = true;
       this.group.position.y = this.pos.y + Math.abs(Math.sin(t * 5)) * 0.03;
       return;
     }
-    const bob = Math.sin(t * (speed > 0.2 ? 9 : 1.8)) * (speed > 0.2 ? 0.045 : 0.015);
+    const bob = Math.sin(t * (walk ? 9 : 1.8)) * (walk ? 0.045 : 0.015);
     this.group.position.y = this.pos.y + bob;
-    this.group.rotation.z = Math.sin(t * (speed > 0.2 ? 8 : 1.6)) * 0.045;
-    const baseY = m.variant.bodyScale[1];
-    m.body.scale.y = baseY * (1 + Math.sin(t * 7) * (speed > 0.2 ? 0.035 : 0.012));
-    m.legs[0].rotation.x = Math.sin(t * 9) * 0.35 * Math.min(1, speed * 0.4);
-    m.legs[1].rotation.x = -Math.sin(t * 9) * 0.35 * Math.min(1, speed * 0.4);
-    m.arms[0].rotation.x = -Math.sin(t * 9) * 0.3 * Math.min(1, speed * 0.4);
-    m.arms[1].rotation.x = Math.sin(t * 9) * 0.3 * Math.min(1, speed * 0.4);
+    this.group.rotation.z = Math.sin(t * (walk ? 8 : 1.6)) * 0.045;
+    if (m.modelBased) {
+      // GLB 模型：整体呼吸 + 走路摇摆（无独立四肢关节）
+      m.body.scale.y = 1 + Math.sin(t * 7) * (walk ? 0.035 : 0.012);
+      m.body.scale.x = 1 - Math.sin(t * 7) * (walk ? 0.02 : 0.008);
+      m.body.rotation.z = Math.sin(t * (walk ? 8 : 1.6)) * 0.05;
+      m.body.rotation.x = walk ? Math.sin(t * 9) * 0.05 : 0;
+    } else {
+      const baseY = m.variant.bodyScale[1];
+      m.body.scale.y = baseY * (1 + Math.sin(t * 7) * (walk ? 0.035 : 0.012));
+      m.legs[0].rotation.x = Math.sin(t * 9) * 0.35 * Math.min(1, speed * 0.4);
+      m.legs[1].rotation.x = -Math.sin(t * 9) * 0.35 * Math.min(1, speed * 0.4);
+      m.arms[0].rotation.x = -Math.sin(t * 9) * 0.3 * Math.min(1, speed * 0.4);
+      m.arms[1].rotation.x = Math.sin(t * 9) * 0.3 * Math.min(1, speed * 0.4);
+    }
     // 越近越失控：小嘴裂成表情包里的大笑巨口
     const open = this.state === 'chase' && dist < 10.5;
     m.scary.visible = open;
-    m.mouth.visible = !open;
+    if (m.mouth) m.mouth.visible = !open;
     if (open) {
       const k = clamp((11 - dist) / 7, 0, 1);
-      m.scary.scale.set(0.8 + 0.35 * k, 0.8 + 0.3 * k, 1);
-      m.scary.position.y = (0.78 + m.variant.legLen) - 0.16;
-      for (const e of m.eyes) {
-        e.pupil.scale.setScalar(1 + 0.16 * k);
-        e.ring.scale.z = 0.42;
+      if (m.modelBased) {
+        const s = m.scaryBaseScale * (0.9 + 0.4 * k);
+        m.scary.scale.set(s, s, s);
+        m.scary.position.y = m.scaryBaseY - 0.05 * k;
+      } else {
+        m.scary.scale.set(0.8 + 0.35 * k, 0.8 + 0.3 * k, 1);
+        m.scary.position.y = m.scaryBaseY;
+      }
+      if (m.eyes) {
+        for (const e of m.eyes) { e.pupil.scale.setScalar(1 + 0.16 * k); e.ring.scale.z = 0.42; }
       }
     } else {
-      for (const e of m.eyes) e.pupil.scale.setScalar(1);
+      if (m.eyes) for (const e of m.eyes) e.pupil.scale.setScalar(1);
     }
     if (m.eyes) {
       const blink = (Math.sin(t * 0.7) > 0.985) ? 0.12 : 1;
@@ -371,11 +489,11 @@ class Frog {
 }
 
 export class FrogManager {
-  constructor(world, player, audio) {
+  constructor(world, player, audio, modelTemplate) {
     this.world = world;
     this.player = player;
     this.audio = audio;
-    this.frogs = FROG_DEFS.map((d, i) => new Frog(d, i, world, player, audio));
+    this.frogs = FROG_DEFS.map((d, i) => new Frog(d, i, world, player, audio, modelTemplate));
     this.active = false;
     this.flowTimer = 0;
     this.grace = 0;

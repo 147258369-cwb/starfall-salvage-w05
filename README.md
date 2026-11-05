@@ -58,7 +58,8 @@ python serve.py 8000
 
 奶蛙：
 - 共 4 只，3 种体型/速度（小奶蛙、胖奶蛙、长腿奶蛙），一直在地图里游荡并追着你。
-- 外观按网络「奶蛙」表情包重做：奶黄色软胶身体、绿色大圆眼、小嘴与奶油色肚皮；靠近时会裂开成一张失控的大笑巨口。
+- 身体使用组员提供的 **`nailong_colored_2.0.glb` 奶龙 3D 模型**（原创几何，非官方素材）：奶黄色软胶身体、绿色大圆眼、小嘴与奶油色肚皮；靠近时会裂开成一张失控的大笑巨口（程序化动画，模型本身为静态网格）。
+- 模型没有骨骼与肢体动画，走路以整体摇摆/呼吸/颠簸表现；若模型加载失败，自动回退为程序化低多边形奶蛙。
 - 正常行走时它们追不上你，但也甩不掉；**站着不动**或**被堵住**时它们会靠近，贴脸即失败。
 - 冲刺可以把它们甩到「眩晕」状态，暂时失去目标。
 - 靠近时「我是奶龙！我才是奶龙！」会越来越响，心跳与红色暗角也会加重。
@@ -113,19 +114,22 @@ Demo 使用与真人游玩完全相同的场景、HUD、AI、声音与胜负逻�
 ├─ pnpm-lock.yaml        # 锁定文件（开发期使用）
 ├─ vendor/
 │  └─ three.module.js    # Three.js r160（MIT），本地 vendored
+│  └─ three/             # GLTFLoader + BufferGeometryUtils（MIT），本地 vendored，用于加载奶蛙 GLB
 ├─ src/
 │  ├─ main.js            # 游戏状态机、相机/渲染循环、流程衔接
 │  ├─ config.js          # 地图布局、奶片/奶蛙位置、剧情文本、数值
 │  ├─ world.js           # 迷宫、6 个区域、家具、灯光、奶片、安全出口
 │  ├─ player.js          # 第一/第三人称、移动碰撞、体力、手电、脚步
-│  ├─ frogs.js           # 奶蛙模型、流场追逐、眩晕、距离音效
+│  ├─ frogs.js           # 奶蛙模型、流场追逐、眩晕、距离音效（支持 GLB 模型模板）
 │  ├─ textures.js        # 程序化 Canvas 贴图（墙/地/顶/海报/标牌/奶蛙脸）
 │  ├─ textures-fallback.js # 贴图兜底（保证资源缺失时仍可运行）
 │  ├─ audio.js           # WebAudio 管理：音乐/音效/旁白/3D 奶蛙声/静音
 │  ├─ ui.js              # 菜单、HUD、小地图、字幕、提示、结算
 │  ├─ story.js           # 片头镜头巡游与字幕
 │  └─ demo.js            # 演示模式机器人
-├─ assets/audio/         # 27 个原创 WAV + manifest.json
+├─ assets/
+│  ├─ models/nailong_colored_2.0.glb  # 奶蛙身体 3D 模型（用户提供，原创几何）
+│  └─ audio/             # 27 个原创 WAV + manifest.json
 ├─ docs/
 │  ├─ CONTRACT.md        # 内部模块/资源契约（Lead 维护）
 │  ├─ AUDIO.md           # 音频生成方式、参数、AI 声明、重新生成
@@ -137,6 +141,10 @@ Demo 使用与真人游玩完全相同的场景、HUD、AI、声音与胜负逻�
 │  ├─ gen_audio.py       # 音频重建（Windows 中文 TTS + numpy）
 │  ├─ audio-preview.html # 音频试听台
 │  ├─ texture-preview.html # 贴图预览页
+│  ├─ model-preview.html # 奶龙 GLB 模型四视角预览页
+│  ├─ frog-look-preview.html # 奶蛙外观预览（GLB + 裂口，闭口/裂口对比）
+│  ├─ inspect_glb.py     # 解析 GLB 结构/颜色通道的小工具
+│  ├─ cdp_shot.mjs       # 无依赖 CDP 截图/控制台检测工具（Node 24+）
 │  ├─ package_submission.py # 生成 release/w05_3d_game/ 提交包
 │  └─ qa/*.mjs           # Playwright 自动化验收脚本
 ├─ release/              # 打包产物（运行 `python tools/package_submission.py` 生成）
@@ -149,7 +157,8 @@ Demo 使用与真人游玩完全相同的场景、HUD、AI、声音与胜负逻�
 ## 8. 素材、依赖与 AI 声明
 
 - **Three.js 0.160.0**：MIT License，本地 `vendor/three.module.js`，运行时不访问 CDN。
-- **所有视觉内容**均为程序化生成：几何体、Canvas 2D 贴图、灯光、特效；没有使用任何外部图片、模型或官方「奶龙 / 奶蛙」素材。奶蛙是对网络迷因（AI 生成的奶龙变异体）的原创低多边形二创：黄体、绿眼、小嘴与失控大笑均用几何与 Canvas 重建，不复制具体图片或官方角色。
+- **GLTFLoader / BufferGeometryUtils（three r160 示例模块）**：MIT License，本地 `vendor/three/`，运行时不访问 CDN；用于加载奶蛙 GLB 模型。
+- **所有视觉内容**均为程序化生成或组员提供的原创几何：几何体、Canvas 2D 贴图、灯光、特效；没有使用任何外部版权图片、模型或官方「奶龙 / 奶蛙」素材。奶蛙身体为组员提供的 **`assets/models/nailong_colored_2.0.glb`**（原创低多边形奶龙模型，无骨骼无动画）；靠近时的失控大笑巨口用程序化几何重建，不复制具体图片或官方角色。
 - **所有音频**为本组原创生成：TTS 旁白/奶蛙台词 + NumPy 合成的音乐/环境/音效。生成方式、参数、AI 声明见 `docs/AUDIO.md`。
 - 代码、贴图、音频、文档在开发过程中使用了 AI 编码代理（DeepSeek Harness / deepseek-v4-1-flash）辅助；所有 AI 产出均经过本地运行、截图或数值自检后保留。详见 `W05_GroupID.md` 的 AI 使用披露。
 - 未使用任何账号、密钥、遥测或远程服务；游戏可离线运行。
@@ -159,6 +168,7 @@ Demo 使用与真人游玩完全相同的场景、HUD、AI、声音与胜负逻�
 ## 9. 已知限制
 
 - 单关卡；「震荡 / 磁铁」等道具未实现（本关按需求只做地图与加速）。
+- 奶蛙身体使用静态 GLB 模型（无骨骼/无动画），走路以整体摇摆/呼吸/颠簸表现，无独立四肢摆动与眨眼；若模型加载失败会回退程序化奶蛙。
 - 仅桌面键鼠；无手柄、无移动端适配。
 - 3D 场景为程序化低多边形风格，非写实；低端集成显卡 / 软件渲染下帧率可能下降。
 - AI 生成的音频与贴图尚未经过人耳/人眼终审，个别音量平衡或贴图细节可能仍需人工微调。
