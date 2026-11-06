@@ -232,6 +232,10 @@ input[type="range"] { accent-color: var(--gold); }
   background: var(--warm); box-shadow: 0 0 10px rgba(255, 210, 140, .6);
 }
 .audio-hint { font-size: 10px; letter-spacing: .16em; color: var(--ui-dim); opacity: .8; }
+.menu-sens { display: flex; align-items: center; gap: 14px; margin-top: 14px; }
+.sens-label { font-size: 11px; letter-spacing: .16em; color: var(--ui-dim); text-transform: uppercase; white-space: nowrap; }
+.sens-value { font-size: 12px; color: var(--gold); min-width: 44px; text-align: right; font-variant-numeric: tabular-nums; }
+.modal-audio.sens { justify-content: center; margin-top: 14px; }
 
 .menu-right { position: relative; height: 100%; pointer-events: none; }
 .menu-quote {

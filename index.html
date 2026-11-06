@@ -86,6 +86,11 @@
         <input id="volume" class="volume" type="range" min="0" max="100" value="70" aria-label="音量" />
         <span class="audio-hint">建议佩戴耳机 · 含惊吓音效</span>
       </div>
+      <div class="menu-sens">
+        <span class="sens-label">画面灵敏度</span>
+        <input id="sensitivity" class="volume" type="range" min="20" max="250" value="100" aria-label="画面灵敏度" />
+        <span class="sens-value" id="sensitivity-value">100%</span>
+      </div>
     </div>
     <div class="menu-right">
       <div class="menu-quote">
@@ -95,7 +100,7 @@
     </div>
   </div>
   <footer class="menu-footer">
-    <span>WASD 移动 · 鼠标 视角 · SHIFT 加速 · E 互动 · V 视角 · M 静音 · ESC 暂停</span>
+    <span>WASD 移动 · 鼠标 视角 · 空格 跳跃 · SHIFT 加速 · E 互动 · V 视角 · M 静音 · ESC 暂停</span>
     <span class="menu-build">v1.0 · 单关试玩 · 大湾区大学 W05</span>
   </footer>
 </div>
@@ -139,6 +144,11 @@
       <button id="btn-pause-mute" class="mute-btn">♪</button>
       <input id="pause-volume" class="volume" type="range" min="0" max="100" value="70" aria-label="音量" />
     </div>
+    <div class="modal-audio sens">
+      <span class="sens-label">画面灵敏度</span>
+      <input id="pause-sensitivity" class="volume" type="range" min="20" max="250" value="100" aria-label="画面灵敏度" />
+      <span class="sens-value" id="pause-sensitivity-value">100%</span>
+    </div>
   </div>
 </div>
 
@@ -151,6 +161,7 @@
       <div><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd><span>移动</span></div>
       <div><kbd>鼠标</kbd><span>转动视角</span></div>
       <div><kbd>SHIFT</kbd><span>加速（解锁后）</span></div>
+      <div><kbd>空格</kbd><span>跳跃</span></div>
       <div><kbd>E</kbd><span>互动 / 开门</span></div>
       <div><kbd>V</kbd><span>第一 / 第三人称</span></div>
       <div><kbd>F</kbd><span>手电筒</span></div>

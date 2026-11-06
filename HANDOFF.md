@@ -26,6 +26,19 @@
 
 ---
 
+## 0.6 最近一次迭代：手感与体验打磨（2026-11-06）
+
+- **画面灵敏度滑条：** 主菜单与暂停菜单新增「画面灵敏度」滑条（20–250%，默认 100%，存 localStorage `mfp.sensitivity`）；`src/player.js` 的 `setSensitivity()` 乘 `PLAYER.mouseSensitivity`，不改 0.0021 基准。
+- **角色跳跃：** 按 **空格** 起跳（约 0.7 米，竖直速度 + 重力，落地才能再跳）；相机跟着跳、第三人称收腿摆臂；起跳有小脚步声；帮助页/底部提示加了「空格 跳跃」。
+- **修复第一人称视角「某个角度突然跳」：** 根因是浏览器 **Pointer Lock 重置**后第一个 mousemove 报超大 `movementX`（光标位置重置），250% 灵敏度下可让视角瞬转 150°+；`src/player.js` 重锁后跳过前 2 个 mousemove + 尖峰相对检测（单次增量 >200px 且 >4× 上一次则按上一次衰减）+ yaw 归一化到 [-π, π)；正常快速转身不受影响。
+- **修复画面抖动：** 奶蛙靠近/惊吓的相机晃动从「每帧随机」改为「平滑正弦波形」（多频叠加脉动），幅度调低，不再高频乱抖。
+- **奶蛙动画打磨：** `src/frogs.js` animate() modelBased 分支：小跳 + 落地挤压 + 摇摆 + 前倾。
+- **玩法提示：** 首次激活奶蛙教学 toast「它听到你了…」；糖分不足 toast「糖分不足…」。
+- **修复小地图奶片不实时消失：** `src/ui.js` drawMinimap 只画未收集奶片（实时读 `collected`），`unlockMap(candies)` 解锁瞬间也带当前状态；`src/main.js` 每帧传 `world.candies`。
+- **验证：** CDP 无 console error / pageerror；跳跃 peak≈0.71m、空格触发、落地复位；地图 3/8 收集后画 5/8；扫 yaw 0–360°（含俯仰、完整 3D 朝向）最大跳变 = 步长（平滑）；锁定重置尖峰 0°、孤立尖峰 120°→7.2°、正常快速转身不受影响。
+
+---
+
 ## 1. 当前状态（TL;DR）
 
 | 项 | 状态 |
@@ -38,7 +51,7 @@
 | 贴图 | ✅ 纯 Canvas 程序化 6 区域墙/地/顶 + 海报/标牌/奶蛙 Jumpscare 脸 |
 | 报告 | ⚠️ 骨架已写，NO AI 段落全部是 TODO，必须组员本人填 |
 | 视频 | ❌ 尚未录制（≤5:00，需真人游玩 + Demo + 反馈/迭代证据） |
-| Git | 最新功能 commit 2d7e1d6；交接文档见 HANDOFF.md；已 push 到 origin/main，工作树干净 |
+| Git | 最新功能 commit 529aeef（GLB 奶蛙）+ 本批手感/跳跃/视角修复待提交；交接文档见 HANDOFF.md；已 push 到 origin/main，工作树含未提交改动 |
 
 ---
 
@@ -107,7 +120,7 @@ HANDOFF.md                     本文件
 - 奶蛙：4 只，3 变种（小/胖/长腿）。正常行走追不上也甩不掉；**站着不动**会被贴近并抓到；冲刺可把它们甩到眩晕。
 - 奶蛙接近：循环语音「我是奶龙！我才是奶龙！」音量随距离增大，叠加心跳、红色暗角、字幕。
 - 被抓：Jumpscare → 「你被找到了」→ 再试一次/回主菜单。
-- 操作：WASD/方向键、鼠标、SHIFT、E、V（第一/第三人称）、F（手电）、M（静音）、ESC（暂停）。
+- 操作：WASD/方向键、鼠标、**空格（跳跃）**、SHIFT、E、V（第一/第三人称）、F（手电）、M（静音）、ESC（暂停）；菜单里有画面灵敏度滑条（20–250%）。
 - 片头 5 句旁白，音频合计 22.69s；引擎每句后停 0.68s，约 26s；可跳过。
 
 ---
@@ -203,6 +216,8 @@ python tools/package_submission.py
 | 奶蛙数量/出生点/变种 | src/config.js 的 FROG_DEFS，src/frogs.js 的 VARIANTS |
 | 奶蛙外观/表情 | src/frogs.js 的 buildFrogModel（GLB 模式）；模型文件 assets/models/nailong_colored_2.0.glb；加载/颜色/朝向在 loadFrogModelTemplate |
 | 追逐距离/速度/眩晕 | src/frogs.js 的 Frog.update；src/config.js 的 PLAYER |
+| 视角/灵敏度/跳跃/视角跳变 | src/player.js 的 bindInput / jump / updateCamera / onLockAcquire |
+| 小地图绘制/解锁 | src/ui.js 的 drawMinimap / unlockMap |
 | 解锁阈值/目标 | src/config.js 的 UNLOCK_MAP_AT/UNLOCK_SPEED_AT/TOTAL_CANDIES |
 | 片头文本/镜头 | src/config.js 的 STORY/STORY_PATH，src/story.js |
 | HUD/菜单样式 | styles.css、src/ui.js |

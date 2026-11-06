@@ -23,6 +23,8 @@ export class UI {
       storyProgress: $('story-progress'), storySkip: $('story-skip'),
       winStats: $('win-stats'), volume: $('volume'), pauseVolume: $('pause-volume'),
       mute: $('btn-mute'), pauseMute: $('btn-pause-mute'), sound: $('btn-sound'),
+      sensitivity: $('sensitivity'), sensitivityValue: $('sensitivity-value'),
+      pauseSensitivity: $('pause-sensitivity'), pauseSensitivityValue: $('pause-sensitivity-value'),
     };
     this.hooks = {};
     this.candies = 0;
@@ -69,6 +71,8 @@ export class UI {
     click('btn-pause', () => this.emit('pause'));
     $('volume').addEventListener('input', (e) => this.emit('volume', Number(e.target.value) / 100));
     $('pause-volume').addEventListener('input', (e) => this.emit('volume', Number(e.target.value) / 100));
+    if (this.el.sensitivity) this.el.sensitivity.addEventListener('input', (e) => this.emit('sensitivity', Number(e.target.value) / 100));
+    if (this.el.pauseSensitivity) this.el.pauseSensitivity.addEventListener('input', (e) => this.emit('sensitivity', Number(e.target.value) / 100));
     this.el.storySkip.addEventListener('click', () => this.emit('skip'));
     window.addEventListener('keydown', (e) => {
       if (this.storyVisible) this.emit('skip');
@@ -160,14 +164,14 @@ export class UI {
     else if (n < TOTAL_CANDIES) this.setObjective(`只剩 ${TOTAL_CANDIES - n} 片 · 前往安全出口`);
     else this.setObjective('出口已打开 · 离开乐园');
   }
-  unlockMap() {
+  unlockMap(candies) {
     this.mapUnlocked = true;
     this.el.minimapWrap.classList.remove('hidden');
     this.el.itemMap.className = 'item unlocked';
     this.el.itemMap.querySelector('.item-lock').textContent = '已解锁';
     this.el.itemMap.classList.add('flash');
     setTimeout(() => this.el.itemMap.classList.remove('flash'), 900);
-    this.drawMinimap(null);
+    this.drawMinimap(candies ? { candies } : null);
   }
   unlockSpeed() {
     this.speedUnlocked = true;
@@ -197,6 +201,13 @@ export class UI {
   setVolume(v) {
     if (this.el.volume) this.el.volume.value = String(Math.round(v * 100));
     if (this.el.pauseVolume) this.el.pauseVolume.value = String(Math.round(v * 100));
+  }
+  setSensitivity(mult) {
+    const pct = Math.round(Math.max(0.2, Math.min(2.5, Number(mult) || 1)) * 100);
+    if (this.el.sensitivity) this.el.sensitivity.value = String(pct);
+    if (this.el.pauseSensitivity) this.el.pauseSensitivity.value = String(pct);
+    if (this.el.sensitivityValue) this.el.sensitivityValue.textContent = pct + '%';
+    if (this.el.pauseSensitivityValue) this.el.pauseSensitivityValue.textContent = pct + '%';
   }
 
   showSubtitle(speaker, text, { frog = false, duration = 4.2 } = {}) {
@@ -286,12 +297,23 @@ export class UI {
     const g = cv.getContext('2d');
     g.clearRect(0, 0, cv.width, cv.height);
     g.drawImage(off, 0, 0);
-    // 奶片
-    for (const [cx, cz] of data.candies) {
-      g.beginPath();
-      g.arc(ox + (cx + 0.5) * cell, oy + (cz + 0.5) * cell, Math.max(1.6, cell * 0.22), 0, Math.PI * 2);
-      g.fillStyle = '#ffd27a';
-      g.fill();
+    // 奶片：只画未被收集的（若传入实时奶片列表）；否则回退到静态全部
+    const liveCandies = playerInfo?.candies;
+    if (liveCandies) {
+      for (const c of liveCandies) {
+        if (!c || c.collected) continue;
+        g.beginPath();
+        g.arc(ox + (c.cx + 0.5) * cell, oy + (c.cz + 0.5) * cell, Math.max(1.6, cell * 0.22), 0, Math.PI * 2);
+        g.fillStyle = '#ffd27a';
+        g.fill();
+      }
+    } else {
+      for (const [cx, cz] of data.candies) {
+        g.beginPath();
+        g.arc(ox + (cx + 0.5) * cell, oy + (cz + 0.5) * cell, Math.max(1.6, cell * 0.22), 0, Math.PI * 2);
+        g.fillStyle = '#ffd27a';
+        g.fill();
+      }
     }
     // 出口
     const ex = ox + (data.exit.wallCell[0] + 0.5) * cell;

@@ -43,12 +43,15 @@ class Game {
     this.demoReturnTimer = null;
     this.volume = 0.7;
     this.muted = false;
+    this.sensMultiplier = 1; // 画面灵敏度倍率（1 = 默认）
     this.pendingMenuMusic = true;
     window.__game = this;
     try {
       const v = localStorage.getItem('mfp.volume');
       if (v !== null) this.volume = Math.max(0, Math.min(1, Number(v)));
       this.muted = localStorage.getItem('mfp.muted') === '1';
+      const s = localStorage.getItem('mfp.sensitivity');
+      if (s !== null) this.sensMultiplier = Math.max(0.2, Math.min(2.5, Number(s)));
     } catch (e) { /* ignore */ }
 
     this.ui = new UI();
@@ -95,6 +98,7 @@ class Game {
     document.addEventListener('pointerlockchange', () => {
       const locked = document.pointerLockElement === this.canvas;
       this.player.lookEnabled = locked && this.state === 'playing';
+      if (locked) this.player.onLockAcquire();
       if (!locked && this.state === 'playing') this.pause();
     });
     window.addEventListener('keydown', (e) => this.onKey(e));
@@ -116,9 +120,11 @@ class Game {
     ui.on('retry', () => this.restart());
     ui.on('soundToggle', () => this.toggleSound());
     ui.on('volume', (v) => this.setVolume(v));
+    ui.on('sensitivity', (v) => this.setSensitivity(v));
     ui.on('pause', () => this.pause());
     ui.on('skip', () => this.skipStory());
     ui.setVolume(this.volume);
+    ui.setSensitivity(this.sensMultiplier);
     ui.setSoundMuted(this.muted);
   }
 
@@ -132,15 +138,22 @@ class Game {
     this.ui.setLoading(0.38, '正在摆好蛋糕和蜡烛……');
     this.player = new Player(this.camera, this.world, this.audio);
     this.scene.add(this.player.model);
+    this.player.setSensitivity(this.sensMultiplier);
     this.player.onFootstep = (i, sprint) => {
       this.audio.playSfx('sfx_footstep_' + (i + 1), { gain: sprint ? 0.6 : 0.42, rate: 0.92 + Math.random() * 0.16 });
     };
+    this.player.onJump = () => this.audio.playSfx('sfx_footstep_1', { gain: 0.5, rate: 1.2 });
     // 预加载奶龙 GLB 模型（失败则回退程序化奶蛙）
     let frogTemplate = null;
     this.ui.setLoading(0.42, '正在给奶蛙换上新装……');
     try { frogTemplate = await loadFrogModelTemplate(); } catch (e) { console.warn('[frog] 模型预加载失败', e); }
     this.frogs = new FrogManager(this.world, this.player, this.audio, frogTemplate);
     this.frogs.onCatch = (f) => this.onCaught(f);
+    this.frogs.onActivate = () => {
+      if (this.frogAlertShown) return;
+      this.frogAlertShown = true;
+      this.ui.toast({ kicker: '奶蛙 · 醒来了', title: '它听到你了', sub: '别停下脚步 · 也别被堵住 · 解锁加速后按 SHIFT 可甩开', duration: 5 });
+    };
     this.frogs.onNearLine = (line) => {
       if (this.state === 'playing' || this.state === 'demo') {
         this.ui.showSubtitle(line.speaker, line.text, { frog: true, duration: 4.8 });
@@ -202,6 +215,8 @@ class Game {
     this.grace = demo ? 99 : 2.5;
     this.scares = 0;
     this.scareCooldown = 0;
+    this.lowStaminaShown = false;
+    this.frogAlertShown = false;
     this.reachedExitPrompt = false;
     this.demoGame.candiesCollected = 0;
     this.demoGame.speedUnlocked = false;
@@ -431,6 +446,13 @@ class Game {
     try { localStorage.setItem('mfp.volume', String(v)); } catch (e) { /* ignore */ }
   }
 
+  setSensitivity(mult) {
+    this.sensMultiplier = Math.max(0.2, Math.min(2.5, Number(mult) || 1));
+    this.player?.setSensitivity(this.sensMultiplier);
+    this.ui.setSensitivity(this.sensMultiplier);
+    try { localStorage.setItem('mfp.sensitivity', String(this.sensMultiplier)); } catch (e) { /* ignore */ }
+  }
+
   // ---------------- 捡拾 / 解锁 ----------------
   collectCandy(c) {
     if (c.collected) return;
@@ -451,7 +473,7 @@ class Game {
 
   unlockMap() {
     this.mapUnlocked = true;
-    this.ui.unlockMap();
+    this.ui.unlockMap(this.world.candies);
     this.ui.toast({ kicker: '获得道具 · ITEM', title: '乐园地图', sub: '平面图已展开 · 红色光点代表它们', duration: 5 });
     this.audio.playSfx('sfx_unlock_map', { gain: 0.85 });
     this.ui.setObjective('地图已解锁 · 继续寻找奶片');
@@ -650,6 +672,10 @@ class Game {
     // HUD
     this.ui.setPointerHint(this.mode === 'human' && !document.pointerLockElement);
     this.ui.setStamina(this.player.stamina);
+    if (this.player.speedUnlocked && this.player.stamina < 25 && !this.lowStaminaShown) {
+      this.lowStaminaShown = true;
+      this.ui.toast({ kicker: '糖分 · 不足', title: '体力见底了', sub: '松开 SHIFT 停下恢复 · 糖分会自动回满', duration: 3.6 });
+    }
     this.ui.setDanger(info.danger);
     if (info.danger > 0.62 && this.scareCooldown <= 0) {
       this.scareCooldown = 6;
@@ -668,6 +694,7 @@ class Game {
         this.ui.drawMinimap({
           x: this.player.position.x, z: this.player.position.z, yaw: this.player.yaw,
           frogs: this.frogs.frogs.map((f) => ({ x: f.pos.x, z: f.pos.z, dist: f.distanceToPlayer })),
+          candies: this.world.candies,
         });
       }
     }

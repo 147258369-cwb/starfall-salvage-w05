@@ -439,11 +439,16 @@ class Frog {
     this.group.position.y = this.pos.y + bob;
     this.group.rotation.z = Math.sin(t * (walk ? 8 : 1.6)) * 0.045;
     if (m.modelBased) {
-      // GLB 模型：整体呼吸 + 走路摇摆（无独立四肢关节）
-      m.body.scale.y = 1 + Math.sin(t * 7) * (walk ? 0.035 : 0.012);
-      m.body.scale.x = 1 - Math.sin(t * 7) * (walk ? 0.02 : 0.008);
-      m.body.rotation.z = Math.sin(t * (walk ? 8 : 1.6)) * 0.05;
-      m.body.rotation.x = walk ? Math.sin(t * 9) * 0.05 : 0;
+      // GLB 模型：小跳 + 落地挤压 + 走路摇摆 + 前倾（无独立四肢关节）
+      const hop = walk ? Math.abs(Math.sin(t * 9)) : 0;   // 0..1 跳跃周期
+      const squash = walk ? Math.sin(t * 18) : 0;          // 落地挤压
+      m.body.scale.y = (1 + Math.sin(t * 7) * 0.02) * (1 + hop * 0.12 - Math.max(0, squash) * 0.09);
+      m.body.scale.x = (1 - Math.sin(t * 7) * 0.012) * (1 - hop * 0.05 + Math.max(0, squash) * 0.05);
+      m.body.scale.z = m.body.scale.x;
+      m.body.rotation.z = Math.sin(t * (walk ? 8 : 1.6)) * (walk ? 0.09 : 0.03);
+      m.body.rotation.x = walk ? 0.05 + Math.sin(t * 9) * 0.04 : 0;
+      // 跳跃整体抬升
+      this.group.position.y += walk ? hop * 0.05 : 0;
     } else {
       const baseY = m.variant.bodyScale[1];
       m.body.scale.y = baseY * (1 + Math.sin(t * 7) * (walk ? 0.035 : 0.012));
@@ -529,6 +534,7 @@ export class FrogManager {
     if (this.active) return;
     this.active = true;
     this.audio?.playSfx('sfx_frog_alert', { gain: 0.7 });
+    this.onActivate?.();
   }
 
   update(dt, time, opts = {}) {

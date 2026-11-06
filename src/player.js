@@ -14,6 +14,10 @@ export class Player {
     this.velocity = new THREE.Vector3();
     this.yaw = SPAWN_YAW;
     this.pitch = 0;
+    this.sensMultiplier = 1; // 画面灵敏度倍率（1 = 默认）
+    this.vy = 0; // 竖直速度
+    this.jumpY = 0; // 跳跃高度
+    this.onGround = true;
     this.input = { forward: 0, strafe: 0, sprint: false };
     this.bot = null;
     this.lookEnabled = false;
@@ -31,6 +35,10 @@ export class Player {
     this.demoSpeedFactor = 1;
     this.flashOn = true;
     this.onFootstep = null;
+    this.onJump = null;
+    this._skipMoves = 0; // 指针锁重置后要跳过的 mousemove 数
+    this._lastMX = 0; // 上一次鼠标水平增量（尖峰检测参考）
+    this._lastMY = 0; // 上一次鼠标竖直增量（尖峰检测参考）
     this.keys = new Set();
     this.moving = false;
     this.sprinting = false;
@@ -51,6 +59,9 @@ export class Player {
     this.stepDist = 0;
     this.frozen = false;
     this.shake = 0;
+    this.vy = 0;
+    this.jumpY = 0;
+    this.onGround = true;
     this.bot = null;
     this.input.forward = 0;
     this.input.strafe = 0;
@@ -142,6 +153,7 @@ export class Player {
         if (k.startsWith('arrow')) e.preventDefault();
       }
       if (k === 'shift') this.keys.add('shift');
+      if (k === ' ') { this.jump(); e.preventDefault(); }
     });
     window.addEventListener('keyup', (e) => {
       const k = e.key.toLowerCase();
@@ -151,18 +163,47 @@ export class Player {
     window.addEventListener('blur', () => this.keys.clear());
     document.addEventListener('mousemove', (e) => {
       if (!this.lookEnabled || !document.pointerLockElement) return;
-      this.yaw -= e.movementX * PLAYER.mouseSensitivity;
-      this.pitch -= e.movementY * PLAYER.mouseSensitivity;
+      // 指针锁重置后浏览器首个 mousemove 会报超大增量，跳过，避免视角突然跳变
+      if (this._skipMoves > 0) { this._skipMoves--; return; }
+      const sens = PLAYER.mouseSensitivity * this.sensMultiplier;
+      const rawMX = e.movementX || 0, rawMY = e.movementY || 0;
+      // 尖峰识别：单次增量异常大且远超上一次 → 按上一次量衰减，拦病态尖峰，正常快速转身不受影响
+      let mx = rawMX, my = rawMY;
+      if (Math.abs(rawMX) > 200 && Math.abs(rawMX) > 4 * Math.abs(this._lastMX)) mx = this._lastMX * 2;
+      if (Math.abs(rawMY) > 200 && Math.abs(rawMY) > 4 * Math.abs(this._lastMY)) my = this._lastMY * 2;
+      mx = Math.max(-300, Math.min(300, mx));
+      my = Math.max(-300, Math.min(300, my));
+      this._lastMX = rawMX; this._lastMY = rawMY;
+      this.yaw -= mx * sens;
+      this.pitch -= my * sens;
       this.pitch = clamp(this.pitch, -1.3, 1.3);
+      // 归一化 yaw 到 [-PI, PI)，防止无限累积
+      this.yaw = ((this.yaw + Math.PI) % (Math.PI * 2) + Math.PI * 2) % (Math.PI * 2) - Math.PI;
     });
   }
+
+  // 指针锁重新获取：标记要跳过接下来的 mousemove（光标重置尖峰）
+  onLockAcquire() { this._skipMoves = 2; }
 
   setCameraMode(firstPerson) {
     this.firstPerson = firstPerson;
     this.model.visible = !firstPerson;
   }
 
+  // 设置画面灵敏度倍率（1 = 默认，范围 0.2~2.5）
+  setSensitivity(mult) {
+    this.sensMultiplier = Math.max(0.2, Math.min(2.5, Number(mult) || 1));
+  }
+
   addShake(amount) { this.shake = Math.min(1.2, this.shake + amount); }
+
+  // 跳跃：竖直起跳，落地自动复位
+  jump() {
+    if (!this.onGround || this.frozen || this.bot) return;
+    this.vy = 5.0;
+    this.onGround = false;
+    this.onJump?.();
+  }
 
   get forward() {
     return new THREE.Vector3(-Math.sin(this.yaw), 0, -Math.cos(this.yaw));
@@ -243,6 +284,13 @@ export class Player {
     this.camera.fov = damp(this.camera.fov, this.fovTarget, 6, dt);
     this.camera.updateProjectionMatrix();
 
+    // 跳跃重力：跳起后加速下落，落地复位
+    if (!this.onGround) {
+      this.vy -= 15 * dt;
+      this.jumpY += this.vy * dt;
+      if (this.jumpY <= 0) { this.jumpY = 0; this.vy = 0; this.onGround = true; }
+    }
+
     this.shake = Math.max(0, this.shake - dt * 1.6);
     this.shakeT += dt;
     this.updateCamera(dt, time);
@@ -253,14 +301,17 @@ export class Player {
     const bobAmp = this.firstPerson ? 1 : 0.6;
     const bobY = Math.sin(this.walkPhase * 2) * 0.028 * bobAmp * (this.moving ? 1 : 0.15);
     const bobX = Math.cos(this.walkPhase) * 0.02 * bobAmp * (this.moving ? 1 : 0.1);
-    const shakeX = (Math.random() - 0.5) * this.shake * 0.09;
-    const shakeY = (Math.random() - 0.5) * this.shake * 0.09;
-    const head = new THREE.Vector3(this.position.x, PLAYER.eyeHeight + bobY, this.position.z);
+    // 平滑晃动：用时间波形而非每帧随机，避免“突然跳动”
+    const st = this.shakeT;
+    const shakeX = (Math.sin(st * 37.7) * 0.62 + Math.sin(st * 23.3) * 0.38) * this.shake * 0.05;
+    const shakeY = (Math.sin(st * 41.1 + 1.3) * 0.62 + Math.sin(st * 29.7 + 2.1) * 0.38) * this.shake * 0.045;
+    const shakeRot = (Math.sin(st * 34.3 + 0.7) * 0.6 + Math.sin(st * 21.7 + 2.4) * 0.4) * this.shake * 0.012;
+    const head = new THREE.Vector3(this.position.x, PLAYER.eyeHeight + this.jumpY + bobY, this.position.z);
 
     if (this.firstPerson) {
       this.camera.position.set(head.x + bobX + shakeX, head.y + shakeY, head.z);
       this.camera.rotation.order = 'YXZ';
-      this.camera.rotation.set(this.pitch + (Math.random() - 0.5) * this.shake * 0.02, this.yaw, Math.sin(this.walkPhase) * 0.006 * bobAmp);
+      this.camera.rotation.set(this.pitch + shakeRot, this.yaw, Math.sin(this.walkPhase) * 0.006 * bobAmp);
     } else {
       this.model.visible = true;
       const fwd = this.forward;
@@ -275,7 +326,7 @@ export class Player {
       this.camera.position.copy(clipped);
       this.camera.lookAt(head.x + fwd.x * 1.6, head.y - 0.05, head.z + fwd.z * 1.6);
     }
-    this.model.position.copy(this.position);
+    this.model.position.set(this.position.x, this.jumpY, this.position.z);
     this.model.rotation.y = this.yaw;
   }
 
@@ -283,13 +334,19 @@ export class Player {
     if (!this.model.visible) return;
     const amp = Math.min(0.65, speed * 0.13);
     const s = Math.sin(this.walkPhase);
-    if (this.legs) {
-      this.legs[0].rotation.x = s * amp;
-      this.legs[1].rotation.x = -s * amp;
-    }
-    if (this.arms) {
-      this.arms[0].rotation.x = -s * amp * 0.8;
-      this.arms[1].rotation.x = s * amp * 0.8;
+    if (!this.onGround) {
+      // 跳跃：收腿、摆臂上扬
+      if (this.legs) { this.legs[0].rotation.x = -0.55; this.legs[1].rotation.x = -0.45; }
+      if (this.arms) { this.arms[0].rotation.x = -1.1; this.arms[1].rotation.x = -1.1; }
+    } else {
+      if (this.legs) {
+        this.legs[0].rotation.x = s * amp;
+        this.legs[1].rotation.x = -s * amp;
+      }
+      if (this.arms) {
+        this.arms[0].rotation.x = -s * amp * 0.8;
+        this.arms[1].rotation.x = s * amp * 0.8;
+      }
     }
     const breathe = Math.sin(performance.now() * 0.0016) * 0.01;
     if (this.modelParts) this.modelParts.body.position.y = 1.02 + breathe;
