@@ -7,7 +7,7 @@ import {
 import { World } from './world.js';
 import { Player } from './player.js';
 import { FrogManager, loadFrogModelTemplate } from './frogs.js';
-import { AudioManager } from './audio.js';
+import { AudioManager, HALLUCINATION_DURATION } from './audio.js';
 import { UI } from './ui.js';
 import { Story } from './story.js';
 import { Demo } from './demo.js';
@@ -102,6 +102,15 @@ class Game {
       if (!locked && this.state === 'playing') this.pause();
     });
     window.addEventListener('keydown', (e) => this.onKey(e));
+    const suspendOnBlur = () => {
+      if (this.state === 'playing') this.pause();
+      this.lastFrame = performance.now();
+    };
+    window.addEventListener('blur', suspendOnBlur);
+    document.addEventListener('visibilitychange', () => {
+      if (document.hidden) suspendOnBlur();
+      this.lastFrame = performance.now();
+    });
     window.addEventListener('pointerdown', () => this.onFirstGesture(), { once: true });
   }
 
@@ -178,7 +187,10 @@ class Game {
     try {
       const face = this.textures.frogFace?.();
       const src = face?.image?.toDataURL?.('image/png');
-      if (src) document.getElementById('jumpscare-img').src = src;
+      if (src) {
+        document.getElementById('jumpscare-img').src = src;
+        document.querySelectorAll('#hallucination img').forEach(img => { img.src = src; });
+      }
     } catch (e) { console.warn('[jumpscare] face texture unavailable', e); }
     this.jumpscareEl = document.getElementById('jumpscare');
     this.resetStage(false);
@@ -212,6 +224,13 @@ class Game {
     this.mapUnlocked = false;
     this.speedUnlocked = false;
     this.playTime = 0;
+    this.san = 100;
+    this.milkUnlocked = false;
+    this.milkCooldown = 0;
+    this.hallucinationTriggered = [false, false];
+    this.stopHallucination();
+    this.world.resetDragonMilk();
+    this.ui.setSan(this.san, false, 0);
     this.grace = demo ? 99 : 2.5;
     this.scares = 0;
     this.scareCooldown = 0;
@@ -309,6 +328,7 @@ class Game {
 
   enterPlay(demo) {
     this.state = demo ? 'demo' : 'playing';
+    this.lastFrame = performance.now();
     this.mode = demo ? 'demo' : 'human';
     this.ui.showHud();
     this.ui.setDemo(demo);
@@ -337,6 +357,7 @@ class Game {
   pause() {
     if (this.state !== 'playing') return;
     this.state = 'paused';
+    this.audio.stopHallucination();
     this.player.lookEnabled = false;
     this.player.keys.clear();
     this.player.velocity.set(0, 0, 0);
@@ -353,6 +374,8 @@ class Game {
     this.player.lookEnabled = true;
     this.grace = Math.max(this.grace, 1.2);
     await this.audio.resume();
+    this.lastFrame = performance.now();
+    if (this.hallucination) this.audio.startHallucination(this.hallucination.level, this.hallucination.elapsed);
     this.requestLock();
   }
 
@@ -506,15 +529,95 @@ class Game {
     }
   }
 
-  onCaught(frog) {
-    if (this.state !== 'playing' || this.grace > 0) return;
+  stopHallucination(keepAudio = false) {
+    if (!keepAudio) this.audio?.stopHallucination();
+    this.hallucination = null;
+    const el = document.getElementById('hallucination');
+    if (el) { el.classList.add('hidden'); el.style.opacity = '0'; }
+  }
+
+  startHallucination(level) {
+    this.stopHallucination();
+    this.hallucination = { level, elapsed: 0 };
+    document.getElementById('hallucination').classList.remove('hidden');
+    this.audio.startHallucination(level);
+  }
+
+  updateSan(dt) {
+    this.milkCooldown = Math.max(0, this.milkCooldown - dt);
+    let remaining = Math.max(0, dt);
+    // 两次幻觉各 7 秒，总耗时保持 120 秒。
+    const decayTime = (120 - 2 * HALLUCINATION_DURATION) / Math.log(2);
+    // 拆分跨阈值和幻觉结束的时间，保证低帧率下仍按正确顺序触发。
+    while (remaining > 1e-9 && this.san > 0) {
+      if (this.hallucination) {
+        const h = this.hallucination;
+        const step = Math.min(remaining, HALLUCINATION_DURATION - h.elapsed);
+        h.elapsed += step;
+        remaining -= step;
+        if (h.elapsed >= HALLUCINATION_DURATION - 1e-9) this.stopHallucination(true);
+        else {
+          const el = document.getElementById('hallucination');
+          const visualTime = h.elapsed;
+          const envelope = Math.max(0, Math.min(1, visualTime / 1.5, (HALLUCINATION_DURATION - visualTime) / 1.5));
+          el.style.opacity = String((h.level > 0.2 ? 0.8 : 0.55) * envelope);
+          el.querySelectorAll('img').forEach((img, i) => {
+            const tick = Math.floor(visualTime * (3.3 + i * 0.27) + i * 1.7);
+            img.style.opacity = tick % 5 < (h.level > 0.2 ? 3 : 2) ? String(0.35 + (tick % 3) * 0.22) : '0';
+          });
+        }
+        continue;
+      }
+      const threshold = !this.hallucinationTriggered[0] ? 20 : !this.hallucinationTriggered[1] ? 10 : 0;
+      const timeToThreshold = this.san > threshold ? decayTime * Math.log((this.san + 100) / (threshold + 100)) : 0;
+      if (remaining >= timeToThreshold) {
+        this.san = threshold;
+        remaining -= timeToThreshold;
+        if (threshold === 0) break;
+        const index = threshold === 20 ? 0 : 1;
+        this.hallucinationTriggered[index] = true;
+        this.startHallucination(index === 0 ? 0.2 : 0.8);
+      } else {
+        this.san = Math.max(0, (this.san + 100) * Math.exp(-remaining / decayTime) - 100);
+        remaining = 0;
+      }
+    }
+    if (!this.milkUnlocked && this.san <= 50) {
+      this.milkUnlocked = true;
+      this.world.unlockDragonMilk();
+      this.ui.toast({ kicker: '意识 · 龙奶', title: '龙奶出现了', sub: '寻找隐藏的玻璃瓶 · 恢复 20% 意识值', duration: 5 });
+    }
+    if (this.san <= 0) {
+      this.ui.setSan(0, this.milkUnlocked, this.milkCooldown);
+      this.onCaught(null, 'san');
+      return;
+    }
+    if (this.milkUnlocked && this.milkCooldown <= 0) {
+      const milk = this.world.getNearbyDragonMilk(this.player.position);
+      if (milk) {
+        this.world.collectDragonMilk(milk);
+        this.san = Math.min(100, this.san + 20);
+        this.milkCooldown = 10;
+        this.audio.playSfx('sfx_pickup', { gain: 0.8 });
+        this.ui.pickupPulse();
+        this.ui.toast({ kicker: '龙奶 · 已拾取', title: '意识值恢复 20%', sub: '下一次拾取需等待 10 秒', duration: 3 });
+      }
+    }
+    this.ui.setSan(this.san, this.milkUnlocked, this.milkCooldown);
+  }
+
+  onCaught(frog, reason = 'caught') {
+    if (this.state !== 'playing' || (reason !== 'san' && this.grace > 0)) return;
+    this.stopHallucination();
     this.state = 'caught';
     this.player.frozen = true;
     this.player.lookEnabled = false;
-    const dx = frog.pos.x - this.player.position.x;
-    const dz = frog.pos.z - this.player.position.z;
-    this.player.yaw = Math.atan2(-dx, -dz);
-    this.player.pitch = -0.22;
+    if (frog) {
+      const dx = frog.pos.x - this.player.position.x;
+      const dz = frog.pos.z - this.player.position.z;
+      this.player.yaw = Math.atan2(-dx, -dz);
+      this.player.pitch = -0.22;
+    }
     this.player.addShake(1.1);
     this.audio.stopMusic(0.5);
     this.audio.playSfx('sfx_screech', { gain: 1 });
@@ -528,7 +631,7 @@ class Game {
       if (this.state !== 'caught') return;
       this.state = 'lose';
       this.jumpscareEl?.classList.add('hidden');
-      this.ui.showLose();
+      this.ui.showLose(reason);
       this.audio.stopMusic(0.4);
     this.audio.stopVoice();
     this.audio.setHeartbeat(0);
@@ -538,6 +641,7 @@ class Game {
 
   async win(isDemo) {
     if (this.state !== 'playing' && this.state !== 'demo') return;
+    this.stopHallucination();
     this.state = 'winFade';
     this.player.frozen = true;
     this.player.lookEnabled = false;
@@ -641,7 +745,10 @@ class Game {
       this.player.updateCamera(0, t);
     } else if (this.state === 'playing' || this.state === 'demo') {
       this.applyAtmosphere('play');
-      this.updatePlay(dt, t);
+      if (this.state === 'playing' && !document.hidden && document.hasFocus()) {
+        this.updateSan(rawDt);
+      }
+      if (this.state === 'playing' || this.state === 'demo') this.updatePlay(dt, t);
     } else if (this.state === 'paused') {
       // 冻结
     } else if (this.state === 'caught') {

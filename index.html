@@ -35,6 +35,11 @@
     </div>
   </header>
 
+  <aside class="san-wrap" aria-label="意识值">
+    <div class="san-head"><span>意识值 · SAN</span><strong id="san-value">100%</strong></div>
+    <div class="san-track"><div id="san-fill"></div></div>
+    <div id="milk-status" class="milk-status">龙奶 · 意识值 50% 时解锁</div>
+  </aside>
   <aside id="minimap-wrap" class="minimap-wrap hidden">
     <div class="map-head"><span>乐园地图</span><em>1987 · F1</em></div>
     <canvas id="minimap" width="260" height="196"></canvas>
@@ -172,6 +177,7 @@
       <li>收集 <b>8 片奶片</b>，从安全出口离开，就算活过这一夜。</li>
       <li>奶蛙会一直跟着你，但追不上正常行走的你。<b>站着不动</b>或<b>被堵死</b>时，它们才会靠近。</li>
       <li>解锁加速后，按住 <kbd>SHIFT</kbd> 冲刺可以把它们甩开。糖分会自动恢复。</li>
+      <li>意识值会持续下降，越低下降越慢；幻觉期间停止下降，归零即失败。降至 50% 后可寻找龙奶，靠近自动拾取并恢复 20%；每次拾取后需等待 10 秒。</li>
       <li>听到「我是奶龙！我才是奶龙！」越来越响，说明它离你越来越近。</li>
     </ul>
     <button id="btn-help-close" class="btn primary"><span>知道了</span><em>CLOSE</em></button>
@@ -197,8 +203,8 @@
   <div class="result-vignette"></div>
   <div class="result-inner">
     <div class="result-kicker">22:44 · 你停下了</div>
-    <h2>你被找到了。</h2>
-    <p class="result-text">它们围过来，很有礼貌地给你让出一个位置。<br />蛋糕上的蜡烛又亮了一根。<br /><b>“欢迎新朋友。”</b></p>
+    <h2 id="lose-title">你被找到了。</h2>
+    <p id="lose-text" class="result-text">它们围过来，很有礼貌地给你让出一个位置。<br />蛋糕上的蜡烛又亮了一根。<br /><b>“欢迎新朋友。”</b></p>
     <div class="modal-actions">
       <button id="btn-lose-retry" class="btn primary"><span>再试一次</span><em>RETRY</em></button>
       <button id="btn-lose-menu" class="btn ghost"><span>返回主菜单</span><em>MENU</em></button>
@@ -224,6 +230,7 @@
   </div>
 </div>
 
+<div id="hallucination" class="hallucination hidden" aria-hidden="true"><img id="hallucination-img" alt="" /><img alt="" /><img alt="" /><img alt="" /><img alt="" /><img alt="" /></div>
 <div id="jumpscare" class="jumpscare hidden" aria-hidden="true"><img id="jumpscare-img" alt="" /></div>
 <div id="fade" class="fade"></div>
 <div id="flash" class="flash"></div>

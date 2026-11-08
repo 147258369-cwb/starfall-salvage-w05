@@ -131,7 +131,19 @@ export class UI {
       this.el.winStats.innerHTML = stats.map((s) => `<div><div class="v">${s.value}</div><div class="k">${s.label}</div></div>`).join('');
     }
   }
-  showLose() { this.el.hud.classList.add('hidden'); this.el.lose.classList.remove('hidden'); }
+  showLose(reason = 'caught') {
+    this.el.hud.classList.add('hidden');
+    $('lose-title').textContent = reason === 'san' ? '意识值耗尽' : '你被找到了。';
+    $('lose-text').innerHTML = reason === 'san' ? '意识沉入黑暗，乐园里的笑声越来越近。' : '它们围过来，很有礼貌地给你让出一个位置。<br />蛋糕上的蜡烛又亮了一根。<br /><b>“欢迎新朋友。”</b>';
+    this.el.lose.classList.remove('hidden');
+  }
+  setSan(value, unlocked, cooldown) {
+    const v = Math.max(0, Math.min(100, value));
+    $('san-value').textContent = Math.ceil(v) + '%';
+    $('san-fill').style.width = v + '%';
+    $('san-fill').classList.toggle('low', v < 20);
+    $('milk-status').textContent = !unlocked ? '龙奶 · 意识值 50% 时解锁' : cooldown > 0 ? `龙奶冷却 · ${Math.ceil(cooldown)} 秒` : '龙奶 · 可拾取';
+  }
   hideResults() { this.el.win.classList.add('hidden'); this.el.lose.classList.add('hidden'); }
   setDemo(on) { this.el.demoBanner.classList.toggle('hidden', !on); }
 

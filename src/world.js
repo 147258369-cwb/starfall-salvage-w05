@@ -1,7 +1,7 @@
 // 奶蛙乐园 — 世界构建：迷宫、装修、灯光、奶片、出口
 import * as THREE from 'three';
 import {
-  GRID, ROOMS, CORRIDORS, DOORS, CANDY_CELLS, EXIT,
+  GRID, ROOMS, CORRIDORS, DOORS, CANDY_CELLS, EXIT, DRAGON_MILK, SPAWN_CELL,
   buildGrid, cellCenter, worldToCell,
 } from './config.js';
 
@@ -70,6 +70,7 @@ export class World {
     this.buildProps();
     this.buildLights();
     this.buildCandies();
+    this.buildDragonMilk();
     this.buildExit();
     this.buildDust();
   }
@@ -768,6 +769,127 @@ export class World {
     });
   }
 
+  // ---------------- 龙奶：每局随机分布、SAN 解锁后可见 ----------------
+  buildDragonMilk() {
+    this.dragonMilk = [];
+    this.dragonMilkUnlocked = false;
+    const glass = new THREE.MeshStandardMaterial({
+      color: 0xd9f6f1, roughness: 0.16, metalness: 0.1,
+      transparent: true, opacity: 0.34, depthWrite: false,
+    });
+    const milk = new THREE.MeshStandardMaterial({
+      color: 0xfffdf1, roughness: 0.48, emissive: 0xc5d4bb, emissiveIntensity: 0.35,
+    });
+    const cap = new THREE.MeshStandardMaterial({ color: 0xa6c6a3, roughness: 0.52, metalness: 0.2 });
+    const bodyGeo = new THREE.CylinderGeometry(0.16, 0.18, 0.48, 16, 1, true);
+    const milkGeo = new THREE.CylinderGeometry(0.135, 0.15, 0.32, 16);
+    const shoulderGeo = new THREE.CylinderGeometry(0.075, 0.16, 0.12, 16, 1, true);
+    const neckGeo = new THREE.CylinderGeometry(0.075, 0.075, 0.1, 16, 1, true);
+    const capGeo = new THREE.CylinderGeometry(0.085, 0.085, 0.065, 16);
+    for (let i = 0; i < DRAGON_MILK.count; i++) {
+      const group = new THREE.Group();
+      const body = new THREE.Mesh(bodyGeo, glass); body.position.y = 0.25; group.add(body);
+      const liquid = new THREE.Mesh(milkGeo, milk); liquid.position.y = 0.19; group.add(liquid);
+      const shoulder = new THREE.Mesh(shoulderGeo, glass); shoulder.position.y = 0.55; group.add(shoulder);
+      const neck = new THREE.Mesh(neckGeo, glass); neck.position.y = 0.66; group.add(neck);
+      const lid = new THREE.Mesh(capGeo, cap); lid.position.y = 0.735; group.add(lid);
+      group.visible = false;
+      this.group.add(group);
+      this.dragonMilk.push({ index: i, group, collected: false, available: false, phase: i * 2.1 });
+    }
+    this.resetDragonMilk();
+  }
+
+  // 保守使用格子中心寻路，排除墙、家具和糖片；房间顺序及房内位置每局洗牌。
+  resetDragonMilk() {
+    this.dragonMilkUnlocked = false;
+    const shuffle = (a) => {
+      for (let i = a.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [a[i], a[j]] = [a[j], a[i]];
+      }
+      return a;
+    };
+    const start = this.nearestBotWalkable(...SPAWN_CELL);
+    const reachable = new Set();
+    if (start) {
+      const queue = [start];
+      reachable.add(start.join(','));
+      for (let i = 0; i < queue.length; i++) {
+        const [cx, cz] = queue[i];
+        for (const [dx, dz] of DIRS4) {
+          const nx = cx + dx, nz = cz + dz, key = `${nx},${nz}`;
+          if (!reachable.has(key) && this.isBotWalkable(nx, nz)) {
+            reachable.add(key); queue.push([nx, nz]);
+          }
+        }
+      }
+    }
+    const roomCandidates = shuffle(ROOMS.map((r) => {
+      const cells = [];
+      for (let z = r.z; z < r.z + r.h; z++) for (let x = r.x; x < r.x + r.w; x++) {
+        if (!reachable.has(`${x},${z}`)) continue;
+        const wx = (x + 0.5) * C, wz = (z + 0.5) * C;
+        // 避免与奶片、出生点重叠，并留出玩家碰撞半径。
+        if (CANDY_CELLS.some(([a, b]) => Math.hypot(x - a, z - b) < 1.4)) continue;
+        if (Math.hypot(x - SPAWN_CELL[0], z - SPAWN_CELL[1]) < 2) continue;
+        if (this.obstacles.some((o) => Math.abs(wx - o.x) < o.hx + 0.7 && Math.abs(wz - o.z) < o.hz + 0.7)) continue;
+        cells.push({ x: wx, z: wz, cx: x, cz: z, room: r.id });
+      }
+      return shuffle(cells);
+    }));
+    const selected = [];
+    for (const candidates of roomCandidates) {
+      const site = candidates.find((p) => selected.every((q) => Math.hypot(p.x - q.x, p.z - q.z) >= DRAGON_MILK.minSeparation));
+      if (site) selected.push(site);
+      if (selected.length >= this.dragonMilk.length) break;
+    }
+    this.dragonMilk.forEach((item, i) => {
+      const site = selected[i];
+      item.collected = false;
+      item.available = !!site;
+      item.group.visible = false;
+      if (site) {
+        Object.assign(item, site);
+        item.group.position.set(site.x, 0.04, site.z);
+        item.group.rotation.set(0, 0, 0);
+      }
+    });
+  }
+
+  unlockDragonMilk() {
+    if (this.dragonMilkUnlocked) return;
+    this.dragonMilkUnlocked = true;
+    for (const item of this.dragonMilk) item.group.visible = item.available && !item.collected;
+  }
+
+  getNearbyDragonMilk(position, radius = DRAGON_MILK.interactionRadius) {
+    if (!this.dragonMilkUnlocked || !position) return null;
+    let nearest = null, best = radius;
+    for (const item of this.dragonMilk) {
+      if (!item.available || item.collected) continue;
+      const distance = Math.hypot(position.x - item.x, position.z - item.z);
+      if (distance <= best) {
+        // 不允许隔着墙或家具自动拾取。
+        const steps = Math.max(1, Math.ceil(distance / 0.12));
+        let blocked = false;
+        for (let i = 1; i < steps; i++) {
+          const t = i / steps;
+          if (this.pointBlocked(position.x + (item.x - position.x) * t, position.z + (item.z - position.z) * t)) { blocked = true; break; }
+        }
+        if (!blocked) { nearest = item; best = distance; }
+      }
+    }
+    return nearest;
+  }
+
+  collectDragonMilk(item) {
+    if (!this.dragonMilkUnlocked || !this.dragonMilk.includes(item) || !item.available || item.collected) return false;
+    item.collected = true;
+    item.group.visible = false;
+    return true;
+  }
+
   buildExit() {
     const xFace = EXIT.wallCell[0] * C;
     const zc = (EXIT.wallCell[1] + 0.5) * C;
@@ -864,6 +986,11 @@ export class World {
       c.group.position.y = c.baseY + Math.sin(t * 1.8 + c.phase) * 0.12;
       c.group.rotation.y += dt * 1.4;
       if (c.glow) c.glow.material.opacity = 0.4 + 0.18 * Math.sin(t * 2.2 + c.phase);
+    }
+    for (const item of this.dragonMilk) {
+      if (!item.group.visible) continue;
+      item.group.position.y = 0.04 + 0.025 * Math.sin(t * 1.6 + item.phase);
+      item.group.rotation.y += dt * 0.35;
     }
     for (let i = 0; i < this.cakeFlames.length; i++) {
       const fl = this.cakeFlames[i];
