@@ -1,4 +1,6 @@
 // 音频管理：manifest 加载、音乐交叉淡化、3D 奶蛙声、心跳、语音、静音
+export const HALLUCINATION_DURATION = 7;
+const HALLUCINATION_FADE = 1.5;
 const MANIFEST_URL = './assets/audio/manifest.json';
 
 const FALLBACK_DURATION = {
@@ -196,6 +198,37 @@ export class AudioManager {
     const remove = () => this.activeSfx.delete(handle);
     src.onended = remove;
     src.start(this.ctx.currentTime + delay);
+  }
+
+  // 幻觉独立于其他音效，暂停后可从已播放位置继续。
+  startHallucination(level, elapsed = 0) {
+    this.stopHallucination();
+    const buf = this.buffers.get('nailong_catch');
+    const duration = HALLUCINATION_DURATION + 1, fade = HALLUCINATION_FADE;
+    if (!this.ctx || !buf || elapsed >= duration) return;
+    const src = this.ctx.createBufferSource();
+    src.buffer = buf;
+    src.loop = true;
+    src.playbackRate.value = 0.5;
+    const g = this._gainNode(0);
+    src.connect(g);
+    const now = this.ctx.currentTime;
+    const envelope = (s) => Math.max(0, Math.min(1, s / fade, (duration - s) / fade));
+    g.gain.setValueAtTime(level * envelope(elapsed), now);
+    if (elapsed < fade) g.gain.linearRampToValueAtTime(level, now + fade - elapsed);
+    if (elapsed < duration - fade) g.gain.setValueAtTime(level, now + duration - fade - elapsed);
+    g.gain.linearRampToValueAtTime(0, now + duration - elapsed);
+    src.start(now, (elapsed * 0.5) % buf.duration);
+    src.stop(now + duration - elapsed);
+    this.hallucinationAudio = { src, gain: g };
+    src.onended = () => { if (this.hallucinationAudio?.src === src) this.hallucinationAudio = null; g.disconnect(); };
+  }
+  stopHallucination() {
+    const h = this.hallucinationAudio;
+    this.hallucinationAudio = null;
+    if (!h) return;
+    try { h.src.stop(); } catch (e) { /* already stopped */ }
+    try { h.gain.disconnect(); } catch (e) { /* already disconnected */ }
   }
 
   stopSfx(key = null) {

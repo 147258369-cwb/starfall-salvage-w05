@@ -303,6 +303,25 @@ input[type="range"] { accent-color: var(--gold); }
   backdrop-filter: blur(4px);
 }
 
+.san-wrap {
+  position: absolute; left: clamp(18px, 3vw, 40px); bottom: clamp(18px, 3vh, 30px);
+  width: 220px; padding: 9px 12px; background: rgba(7, 5, 6, .78);
+  border: 1px solid rgba(216, 168, 90, .25); color: var(--warm);
+}
+.san-head { display: flex; justify-content: space-between; font-size: 11px; letter-spacing: .12em; }
+.san-track { height: 5px; margin-top: 6px; background: rgba(255,255,255,.12); }
+#san-fill { width: 100%; height: 100%; background: #a8d8c5; }
+#san-fill.low { background: #d94a3a; }
+.milk-status { font-size: 9px; color: #d1b99a; margin-top: 5px; }
+.hallucination { position: fixed; inset: 0; z-index: 9; pointer-events: none; overflow: hidden; opacity: 0; mix-blend-mode: screen; }
+.hallucination img { position: absolute; filter: blur(2px) hue-rotate(35deg); opacity: 0; }
+.hallucination img:nth-child(1) { width: 33vw; left: 1%; top: 1%; transform: rotate(-16deg); }
+.hallucination img:nth-child(2) { width: 18vw; left: 58%; top: 8%; transform: rotate(21deg); }
+.hallucination img:nth-child(3) { width: 42vw; left: 30%; top: 27%; transform: rotate(8deg); }
+.hallucination img:nth-child(4) { width: 23vw; right: -3%; bottom: -5%; transform: rotate(-24deg); }
+.hallucination img:nth-child(5) { width: 14vw; left: 12%; bottom: 3%; transform: rotate(15deg); }
+.hallucination img:nth-child(6) { width: 26vw; right: 10%; top: 38%; transform: rotate(-12deg); }
+
 .minimap-wrap {
   position: absolute; left: clamp(18px, 3vw, 40px); bottom: clamp(104px, 15vh, 150px);
   width: 284px;

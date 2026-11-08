@@ -3,6 +3,8 @@ export const GRID = { W: 27, H: 21, cell: 3.2, wallH: 3.45 };
 export const TOTAL_CANDIES = 8;
 export const UNLOCK_MAP_AT = 3;
 export const UNLOCK_SPEED_AT = 6;
+// 龙奶每局随机分布在不同房间；交互距离为水平世界坐标距离。
+export const DRAGON_MILK = { count: 3, interactionRadius: 1.6, minSeparation: 12 };
 export const PLAYER = {
   walkSpeed: 4.1,
   sprintSpeed: 7.4,
