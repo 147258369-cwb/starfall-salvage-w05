@@ -236,6 +236,28 @@
 <div id="flash" class="flash"></div>
 
 <noscript><div class="noscript">这个游戏需要启用 JavaScript。</div></noscript>
+<script>
+// file:// 直接双击 index.html 时，ES Module 与音频 fetch 会被浏览器拦截，
+// 表现为停在加载页、或菜单能显示但所有按钮都没反应。这里提前把原因说清楚，
+// 否则玩家只会以为游戏坏了。
+(function () {
+  if (location.protocol !== 'file:') return;
+  function warn() {
+    var status = document.getElementById('loading-status');
+    if (status) {
+      status.innerHTML = '不能用 file:// 直接打开这个页面。<br>' +
+        '请在项目目录运行 <code style="color:#d6d46c">python serve.py 8000</code>，<br>' +
+        '然后访问 <code style="color:#d6d46c">http://127.0.0.1:8000/</code>';
+    }
+    var bar = document.getElementById('loading-fill');
+    if (bar) { bar.style.width = '100%'; bar.style.background = '#a33'; }
+    var tip = document.querySelector('.loading-tip');
+    if (tip) tip.textContent = '浏览器安全策略禁止 file:// 加载 ES Module 与本地音频，这不是游戏本身的问题。';
+  }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', warn);
+  else warn();
+})();
+</script>
 <script type="module" src="./src/main.js"></script>
 </body>
 </html>

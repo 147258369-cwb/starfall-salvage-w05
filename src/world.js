@@ -306,6 +306,9 @@ export class World {
       this.addBox(0.06, 0.44, 0.06, MAT.woodDark,
         x + sx * 0.22, 0.22, z + sz * 0.22);
     }
+    // 椅子也要挡人：0.55x0.55 的座面按旋转后的外接盒算
+    const half = 0.3;
+    this.addObstacle(x, z, half, half);
   }
   addBed(cx, cz) {
     const [x, z] = [(cx + 0.5) * C, (cz + 0.5) * C];
@@ -558,7 +561,8 @@ export class World {
     const nl = this.addCyl(0.12, 0.16, 0.26, 10, MAT.cream, 1.55 * C, 0.13, 11.55 * C);
     this.addGlowSprite(1.55 * C, 0.42, 11.55 * C, 1.1, 0x9fc6ff, 0.4);
     // 摇椅
-    this.addBox(0.6, 0.1, 0.9, MAT.wood, 5.8 * C, 0.45, 11.8 * C, 0.4);
+    // 摇椅（要给碰撞，否则玩家直接穿过去）
+    this.addBox(0.6, 0.1, 0.9, MAT.wood, 5.8 * C, 0.45, 11.8 * C, 0.4, true);
     this.addBox(0.6, 0.7, 0.08, MAT.wood, 5.8 * C, 0.85, 12.15 * C, 0.4);
     // 玩具箱 / 地毯 / 窗帘 / 毛绒玩具
     this.addBox(1.0, 0.55, 0.6, MAT.pink, 3.6 * C, 0.28, 17.7 * C, 0, true);
@@ -1082,11 +1086,20 @@ export class World {
     }
     return true;
   }
-  pointBlocked(x, z) {
+  pointBlocked(x, z, pad = 0.02) {
     const cx = Math.floor(x / C), cz = Math.floor(z / C);
     if (!this.isWalkable(cx, cz)) return true;
+    // 墙体按格划分，格内的可行走区域最多贴到格子边界；
+    // 因此与格子边界的距离小于 pad 时也要算作被挡住，否则镜头会贴到墙面上。
+    const localX = x - cx * C, localZ = z - cz * C;
+    // 邻近格子边界时：只有当越过去的那一格本身可行走（开阔空间延续），才算安全。
+    // 之前写成「左右任一侧可行走就算安全」，导致贴着墙的那一格被判为安全，镜头会贴到墙面上。
+    if (localX < pad && !this.isWalkable(cx - 1, cz)) return true;
+    if (localX > C - pad && !this.isWalkable(cx + 1, cz)) return true;
+    if (localZ < pad && !this.isWalkable(cx, cz - 1)) return true;
+    if (localZ > C - pad && !this.isWalkable(cx, cz + 1)) return true;
     for (const o of this.obstacles) {
-      if (Math.abs(x - o.x) < o.hx + 0.02 && Math.abs(z - o.z) < o.hz + 0.02) return true;
+      if (Math.abs(x - o.x) < o.hx + pad && Math.abs(z - o.z) < o.hz + pad) return true;
     }
     return false;
   }
@@ -1097,7 +1110,8 @@ export class World {
       const t = i / steps;
       const x = from.x + (to.x - from.x) * t;
       const z = from.z + (to.z - from.z) * t;
-      if (this.pointBlocked(x, z)) break;
+      // 用镜头半径做安全边距：近裁剪面 0.08，贴墙 0.02 会直接看穿墙体。
+      if (this.pointBlocked(x, z, r)) break;
       out.set(x, to.y, z);
     }
     return out;

@@ -69,9 +69,11 @@ export function loadFrogModelTemplate() {
 // 奶蛙 = 奶龙的 AI 变异体：黄色软胶身体、绿色圆眼、极小嘴；
 // 参考网络「奶蛙」表情包，不使用官方奶龙素材。靠近时裂开成大笑巨口。
 const VARIANTS = {
-  small: { bodyColor: 0xf4d64a, scale: 0.78, bodyScale: [1.0, 1.14, 0.98], eyeR: 0.2, legLen: 0.3, speed: 4.45, radius: 0.48, seed: 1 },
-  fat:   { bodyColor: 0xf2d247, scale: 1.3, bodyScale: [1.2, 1.02, 1.12], eyeR: 0.17, legLen: 0.24, speed: 4.15, radius: 0.66, seed: 2 },
-  tall:  { bodyColor: 0xf6dc5a, scale: 1.0, bodyScale: [0.9, 1.34, 0.92], eyeR: 0.19, legLen: 0.55, speed: 4.35, radius: 0.5, seed: 3 },
+  // radius 必须匹配模型实际身宽（实测半宽：small 0.52、fat 0.87、tall 0.67），
+  // 否则奶蛙贴墙走时身体会插进墙里（穿模）。
+  small: { bodyColor: 0xf4d64a, scale: 0.78, bodyScale: [1.0, 1.14, 0.98], eyeR: 0.2, legLen: 0.3, speed: 4.45, radius: 0.62, seed: 1 },
+  fat:   { bodyColor: 0xf2d247, scale: 1.3, bodyScale: [1.2, 1.02, 1.12], eyeR: 0.17, legLen: 0.24, speed: 4.15, radius: 1.0, seed: 2 },
+  tall:  { bodyColor: 0xf6dc5a, scale: 1.0, bodyScale: [0.9, 1.34, 0.92], eyeR: 0.19, legLen: 0.55, speed: 4.35, radius: 0.78, seed: 3 },
 };
 
 function buildScaryJaws() {

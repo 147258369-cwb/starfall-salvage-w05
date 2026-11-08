@@ -827,4 +827,10 @@ class Game {
   }
 }
 
-window.addEventListener('DOMContentLoaded', () => new Game());
+window.addEventListener('DOMContentLoaded', () => {
+  const game = new Game();
+  // QA 挂钩：只有带 ?debug=1 时才暴露实例，方便自动化脚本核对镜头路径与碰撞，正常游玩不受影响。
+  try {
+    if (new URLSearchParams(location.search).has('debug')) window.__mfp = game;
+  } catch (e) { /* ignore */ }
+});
