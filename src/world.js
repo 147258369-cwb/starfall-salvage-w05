@@ -1053,29 +1053,38 @@ export class World {
       }
     }
   }
+  collectAround(pos) {
+    const cx = Math.floor(pos.x / C);
+    const cz = Math.floor(pos.z / C);
+    const walls = [];
+    const obs = [];
+    for (let oz = -1; oz <= 1; oz++) {
+      for (let ox = -1; ox <= 1; ox++) {
+        const gx = cx + ox, gz = cz + oz;
+        if (!this.isWalkable(gx, gz)) {
+          walls.push({ x: (gx + 0.5) * C, z: (gz + 0.5) * C, hx: C / 2, hz: C / 2 });
+        }
+      }
+    }
+    for (const o of this.obstacles) {
+      if (Math.abs(o.x - pos.x) < o.hx + C * 1.5 && Math.abs(o.z - pos.z) < o.hz + C * 1.5) obs.push(o);
+    }
+    return { walls, obs };
+  }
+
   moveCircle(pos, dx, dz, r = 0.45) {
     const startX = pos.x, startZ = pos.z;
     pos.x += dx;
     pos.z += dz;
     for (let iter = 0; iter < 3; iter++) {
-      const cx = Math.floor(pos.x / C);
-      const cz = Math.floor(pos.z / C);
-      const walls = [];
-      const obs = [];
-      for (let oz = -1; oz <= 1; oz++) {
-        for (let ox = -1; ox <= 1; ox++) {
-          const gx = cx + ox, gz = cz + oz;
-          if (!this.isWalkable(gx, gz)) {
-            walls.push({ x: (gx + 0.5) * C, z: (gz + 0.5) * C, hx: C / 2, hz: C / 2 });
-          }
-        }
-      }
-      for (const o of this.obstacles) {
-        if (Math.abs(o.x - pos.x) < o.hx + C * 1.5 && Math.abs(o.z - pos.z) < o.hz + C * 1.5) obs.push(o);
-      }
+      const { walls, obs } = this.collectAround(pos);
       this.resolveAgainst(walls, pos, r);
       this.resolveAgainst(obs, pos, r);
     }
+    // 收尾以墙体为准：家具靠近墙面时，把身体从家具里推出来有可能又顶进墙里，
+    // 所以最后再单独做一次墙体收束，保证贴墙时永远留够 r 的余量（墙角不穿模）。
+    const last = this.collectAround(pos);
+    this.resolveAgainst(last.walls, pos, r);
     return { movedX: pos.x - startX, movedZ: pos.z - startZ };
   }
   isBotWalkable(cx, cz) {
