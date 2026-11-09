@@ -360,8 +360,9 @@ export class InternalChannel {
       const dims = fmt(size.x, 2) + ' x ' + fmt(size.y, 2) + ' x ' + fmt(size.z, 2);
       const flatDecor = cl.roots.every((r) => r.isMesh && ['PlaneGeometry', 'CircleGeometry', 'TorusGeometry'].includes(r.geometry?.type));
       const floatOk = cl.roots.some((r) => r.userData?.channelFloatOk);
+      const container = cl.roots.some((r) => r.userData?.channelContainer);
       return {
-        ...cl, size, center, cx, cz, geo, flatDecor, floatOk,
+        ...cl, size, center, cx, cz, geo, flatDecor, floatOk, container,
         room: this.roomName(cx, cz),
         label: geo + ' ' + dims,
       };
@@ -521,6 +522,7 @@ export class InternalChannel {
     for (let i = 0; i < list.length; i++) {
       for (let j = i + 1; j < list.length; j++) {
         const a = list[i], b = list[j];
+        if (a.container || b.container) continue;   // 球池这类容器，里面装着东西是正常的
         if (!a.box.intersectsBox(b.box)) continue;
         const inter = a.box.clone().intersect(b.box);
         if (inter.isEmpty()) continue;
@@ -634,6 +636,43 @@ export class InternalChannel {
         fmt(box.getSize(new THREE.Vector3()).x) + ' x ' + fmt(box.getSize(new THREE.Vector3()).y) + ' x ' + fmt(box.getSize(new THREE.Vector3()).z),
       room: this.roomName(cx, cz),
       center, cell: [cx, cz], minY: box.min.y, maxY: box.max.y,
+    };
+  }
+
+  // 屏幕坐标 -> 物件。排查"画面里这个黑块是什么"用。
+  pickAt(clientX, clientY) {
+    const g = this.game;
+    const rect = g.canvas.getBoundingClientRect();
+    const ndc = new THREE.Vector2(
+      ((clientX - rect.left) / rect.width) * 2 - 1,
+      -((clientY - rect.top) / rect.height) * 2 + 1,
+    );
+    const ray = new THREE.Raycaster();
+    ray.setFromCamera(ndc, g.camera);
+    const hits = ray.intersectObjects(g.scene.children, true)
+      .filter((h) => h.object && (h.object.isMesh || h.object.isInstancedMesh));  // 跳过灰尘粒子/光斑 sprite/格网线
+    if (!hits.length) return null;
+    const hit = hits[0];
+    const o = hit.object;
+    const box = new THREE.Box3().setFromObject(o);
+    const c = box.getCenter(new THREE.Vector3());
+    const [cx, cz] = cellOf(c.x, c.z);
+    let root = o;
+    while (root.parent && root.parent !== this.world.group) root = root.parent;
+    return {
+      distance: +hit.distance.toFixed(2),
+      type: o.type,
+      geometry: o.geometry?.type || null,
+      params: o.geometry?.parameters || null,
+      color: o.material?.color ? '#' + o.material.color.getHexString() : null,
+      hasMap: !!o.material?.map,
+      point: hit.point.toArray().map((v) => +v.toFixed(2)),
+      boxMin: box.min.toArray().map((v) => +v.toFixed(2)),
+      boxMax: box.max.toArray().map((v) => +v.toFixed(2)),
+      cell: [cx, cz],
+      room: this.roomName(cx, cz),
+      walkableCell: this.world.isWalkable(cx, cz),
+      parentIsGroup: root !== o,
     };
   }
 

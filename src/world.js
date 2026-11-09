@@ -64,6 +64,7 @@ export class World {
     this.dust = null;
     this.cakeFlames = [];
     this.time = 0;
+    this.posters = [];   // 贴墙物件的元数据，内部通道用来查"是不是挂在门洞或空气上"
 
     this.buildSurfaces();
     this.buildDoorFrames();
@@ -150,6 +151,8 @@ export class World {
     for (let z = 0; z < this.H; z++) {
       for (let x = 0; x < this.W; x++) {
         if (this.grid[z][x]) continue;
+        // 出口那一格墙由 buildExit 换成真正的洞口，这里跳过，否则开门后正对一堵墙。
+        if (x === EXIT.wallCell[0] && z === EXIT.wallCell[1]) continue;
         let touches = false;
         for (const [dx, dz] of DIRS4) if (this.isWalkable(x + dx, z + dz)) { touches = true; break; }
         if (!touches) continue;
@@ -193,7 +196,12 @@ export class World {
         const bz = (cz + 0.5) * C + dz * (C / 2);
         const alongZ = dx !== 0; // 门洞沿 Z 展开
         const postW = 0.2;
-        const postH = 2.82;
+        // 门框柱与门楣都要顶到天花板：原来柱高 2.82、门楣到 3.07，
+        // 天花板在 3.45，顶上会留 0.38 m 的缝，一眼就能看见。
+        const postH = WH;
+        const doorTop = 2.73;                 // 门洞上沿
+        const lintelH = WH - doorTop;         // 门楣一直补到天花板
+        const lintelY = doorTop + lintelH / 2;
         if (alongZ) {
           for (const s of [-1, 1]) {
             const p = new THREE.Mesh(new THREE.BoxGeometry(0.3, postH, postW), frameMat);
@@ -201,8 +209,8 @@ export class World {
             p.userData.channelIgnore = true;   // 门框本来就嵌在墙里，内部通道别报穿墙
             this.group.add(p);
           }
-          const lintel = new THREE.Mesh(new THREE.BoxGeometry(0.34, 0.34, C - 0.1), frameMat);
-          lintel.position.set(bx + dx * 0.05, 2.9, bz);
+          const lintel = new THREE.Mesh(new THREE.BoxGeometry(0.34, lintelH, C - 0.1), frameMat);
+          lintel.position.set(bx + dx * 0.05, lintelY, bz);
           lintel.userData.channelIgnore = true;
           this.group.add(lintel);
         } else {
@@ -212,8 +220,8 @@ export class World {
             p.userData.channelIgnore = true;
             this.group.add(p);
           }
-          const lintel = new THREE.Mesh(new THREE.BoxGeometry(C - 0.1, 0.34, 0.34), frameMat);
-          lintel.position.set(bx, 2.9, bz + dz * 0.05);
+          const lintel = new THREE.Mesh(new THREE.BoxGeometry(C - 0.1, lintelH, 0.34), frameMat);
+          lintel.position.set(bx, lintelY, bz + dz * 0.05);
           lintel.userData.channelIgnore = true;
           this.group.add(lintel);
         }
@@ -277,6 +285,7 @@ export class World {
     frame.rotation.y = ry;
     frame.translateZ(-0.012);
     this.group.add(frame);
+    this.posters.push({ kind: 'poster:' + kind, x: px, z: pz, ry, w, h, y, snapped: snap });
     return m;
   }
   addSign(text, opts, x, y, z, ry, w = 1.8, h = 0.56) {
@@ -286,6 +295,7 @@ export class World {
     m.position.set(x, y, z);
     m.rotation.y = ry;
     this.group.add(m);
+    this.posters.push({ kind: 'sign:' + text, x, z, ry, w, h, y, snapped: 0 });
     return m;
   }
   addGlowSprite(x, y, z, size = 1.6, color = 0xffcf9a, opacity = 0.5) {
@@ -387,6 +397,7 @@ export class World {
     const pit = new THREE.Mesh(new THREE.CylinderGeometry(1.38, 1.38, 0.36, 26),
       new THREE.MeshStandardMaterial({ color: 0xe3b6a0, roughness: 0.9 }));
     pit.position.set(x, 0.18, z);
+    pit.userData.channelContainer = true;   // 池子是容器，里面的球不算穿模
     this.group.add(pit);
     const rim = new THREE.Mesh(new THREE.TorusGeometry(1.38, 0.09, 8, 30),
       new THREE.MeshStandardMaterial({ color: 0xc97b86, roughness: 0.8 }));
@@ -525,8 +536,8 @@ export class World {
     this.addBox(4.4, 1.75, 0.08, MAT.board, 13.5 * C, 1.76, 1.04 * C);
     this.addBox(4.5, 0.08, 0.16, MAT.woodDark, 13.5 * C, 0.9, 1.08 * C);
     this.addBox(0.16, 0.03, 0.03, MAT.white, 44.2, 0.955, 1.08 * C); // 粉笔：躺在粉笔槽上（槽顶 0.94）
-    this.addPoster('drawing', 11.04 * C, 1.78, 3.2 * C, Math.PI / 2, 1.65, 2.2);
-    this.addPoster('rules', 12.0 * C, 1.72, 6.94 * C, Math.PI, 1.5, 2.1);
+    this.addPoster('drawing', 11.04 * C, 1.78, 4.6 * C, Math.PI / 2, 1.65, 2.2); // 原来挂在 3.2 格，正对教室西门(10,3)
+    this.addPoster('rules', 13.2 * C, 1.72, 6.94 * C, Math.PI, 1.5, 2.1); // 原来和 11.6 格的奶蛙海报重叠 0.14 m
     // 讲台
     this.addTable(15.4, 1.85, 2.0, 0.85, 0, 0.8);
     // 课桌
@@ -591,7 +602,7 @@ export class World {
     this.addChair(23.3, 1.85, Math.PI); // 贴办公桌前沿，原来离桌 1.5m
     this.addBox(0.9, 1.75, 0.55, MAT.metalDark, 21.55 * C, 0.88, 1.9 * C, 0, true);
     this.addBox(0.72, 0.8, 0.72, MAT.metal, 24.8 * C, 0.4, 5.25 * C, 0.2, true);
-    this.addPoster('missing', 21.06 * C, 1.72, 3.7 * C, Math.PI / 2, 1.3, 1.9);
+    this.addPoster('missing', 21.06 * C, 1.72, 5.2 * C, Math.PI / 2, 1.3, 1.9); // 原来对着园长室西门(20,3)
     this.addBox(1.0, 0.55, 1.0, MAT.fabric, 24.6 * C, 0.28, 3.1 * C, 0, true);
     // 台灯：放在桌面上（桌高 0.78，台面顶 0.825）。原来整盏灯悬在离桌 5 m 的空中
     {
@@ -670,10 +681,13 @@ export class World {
       this.cakeFlames.push(flame);
     }
     // 生日横幅
-    this.addSign('生日快乐', { sub: 'HAPPY BIRTHDAY · 1999.06.01', bg: '#6d2530', fg: '#ffe6b8' }, 13.5 * C, 2.86, 11.06 * C, 0, 5.2, 0.9);
+    // 横幅要避开北门洞(14,10)。可用墙面是 x 11-13（世界 35.2-44.8），
+    // 中心放 12.5 格 = 40.0，跨度 37.4-42.6，完全落在墙上。
+    this.addSign('生日快乐', { sub: 'HAPPY BIRTHDAY · 1999.06.01', bg: '#6d2530', fg: '#ffe6b8' }, 12.5 * C, 2.72, 11.06 * C, 0, 5.2, 0.86);
     // 取餐台
     this.addBox(0.95, 1.0, 4.0, MAT.metal, 16.25 * C, 0.5, 16.1 * C, 0, true);
-    this.addBox(0.06, 1.05, 4.0, MAT.cream, 15.77 * C, 0.52, 16.1 * C);
+    // 挡板贴在取餐台正面（台面宽 0.95，正面在中心 -0.475 处，板厚 0.06）
+    this.addBox(0.06, 1.05, 4.0, MAT.cream, 16.25 * C - 0.475 - 0.03, 0.52, 16.1 * C);
     // 冰箱
     this.addBox(1.0, 1.9, 1.0, MAT.cream, 16.2 * C, 0.95, 12.2 * C, 0, true);
     this.addBox(0.05, 0.5, 0.1, MAT.metal, 16.2 * C - 0.5 - 0.025, 1.4, 12.2 * C); // 贴冰箱正面，原来悬在冰箱前 1.15 m
@@ -737,24 +751,28 @@ export class World {
       this.addBox(0.06, 0.43, 0.06, MAT.woodDark, bx, 0.215, bz + 0.82);
       this.addObstacle(bx, bz, 0.3, 1.0);
     }
-    this.addPlant(2.4, 8.35, 0.95);
-    this.addPlant(23.8, 8.35, 0.9);
-    this.addPlant(8.35, 11.1, 0.85);
-    this.addPlant(18.4, 6.3, 0.9);
+    // 盆栽一律贴墙脚，别摆在走廊正中间挡路。
+    // 主走廊 z 8-9（世界 25.6-32.0），中央走廊 x 8-9（25.6-32.0），右走廊 x 18-19（57.6-64.0）。
+    this.addPlant(2.4, 9.25, 0.95);    // 主走廊南墙脚下
+    this.addPlant(23.8, 9.25, 0.9);    // 主走廊南墙东段
+    this.addPlant(7.75, 11.1, 0.85);   // 中央走廊西墙脚下
+    this.addPlant(17.75, 6.3, 0.9);    // 右走廊西墙脚下
     // 饮水机
     this.addBox(0.5, 1.1, 0.5, MAT.cream, 10.3 * C, 0.55, 8.42 * C, 0, true);
     this.addCyl(0.19, 0.19, 0.5, 12, MAT.blue, 10.3 * C, 1.3, 8.42 * C);
     // 走廊海报
-    this.addPoster('rules', 5.4 * C, 1.7, 6.97 * C, 0, 1.35, 1.9);
-    this.addPoster('frog', 11.6 * C, 1.72, 6.96 * C, 0, 1.35, 1.9);
-    this.addPoster('birthday', 16.0 * C, 1.7, 6.96 * C, 0, 1.3, 1.85);
+    // 这三张挂在南墙内侧，房间在 -Z 一侧，法线必须朝 -Z（ry = PI）。
+    // 原来写 0，法线插进墙里，从走廊只能看到画框背面 —— 就是"墙上一块纯黑"。
+    this.addPoster('rules', 5.4 * C, 1.7, 6.97 * C, Math.PI, 1.35, 1.9);
+    this.addPoster('frog', 11.6 * C, 1.72, 6.96 * C, Math.PI, 1.35, 1.9);
+    this.addPoster('birthday', 16.0 * C, 1.7, 6.96 * C, Math.PI, 1.3, 1.85);
     this.addPoster('drawing', 4.2 * C, 1.65, 9.96 * C, Math.PI, 1.2, 1.7);
     this.addPoster('missing', 12.3 * C, 1.7, 9.96 * C, Math.PI, 1.2, 1.75);
     this.addPoster('map', 21.4 * C, 1.7, 9.96 * C, Math.PI, 1.55, 1.2);
     // 中央走廊：储物柜、告示
     this.addLockers(7.58, 5.2, 0, 2, 1.9); // 贴中央走廊西墙（x=25.6），原来立在 6.4 m 宽走廊的正中间
     this.addPoster('rules', 8.06 * C, 1.7, 16.6 * C, Math.PI / 2, 1.3, 1.85); // 原来 15.7 格整张被门框/柜体吞掉
-    this.addPoster('frog', 9.94 * C, 1.75, 3.2 * C, -Math.PI / 2, 1.3, 1.85);
+    this.addPoster('frog', 9.94 * C, 1.75, 5.4 * C, -Math.PI / 2, 1.3, 1.85); // 原来对着中央走廊东侧门洞(10,3)
     // 小椅子
     this.addChair(9.3, 10.6, Math.PI * 0.7);
     // 散落蜡笔/纸
@@ -986,9 +1004,19 @@ export class World {
       p.position.set(xFace - 0.06, 1.45, zc + s * 1.62);
       g.add(p);
     }
-    const header = new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.36, 3.55), frameMat);
-    header.position.set(xFace - 0.06, 2.95, zc);
+    // 门楣下移到门洞上沿（2.60），给上面的「安全出口」灯牌让位。
+    // 原来门楣在 2.77-3.13、灯牌在 2.85-3.45，两者重叠。
+    const openTop = 2.60;
+    const header = new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.24, 3.55), frameMat);
+    header.position.set(xFace - 0.06, openTop + 0.12, zc);
     g.add(header);
+    // 门洞以上一直补到天花板，否则从门里能看见墙格的空腔
+    const aboveH = WH - (openTop + 0.24);
+    const above = new THREE.Mesh(new THREE.BoxGeometry(C, aboveH, C),
+      new THREE.MeshStandardMaterial({ map: this.tex.wallpaper('exit'), roughness: 0.94, metalness: 0 }));
+    above.position.set(xFace + C / 2, openTop + 0.24 + aboveH / 2, zc);
+    above.userData.channelIgnore = true;
+    g.add(above);
     // 双开门
     this.exitPanels = [];
     for (const s of [-1, 1]) {
@@ -1009,7 +1037,7 @@ export class World {
     }
     // 安全出口灯牌
     const sign = this.addSign('安全出口', { bg: '#062b1b', fg: '#b6ffd2', glow: true, sub: 'EXIT · 出口' },
-      xFace - 0.2, 3.15, zc, -Math.PI / 2, 1.9, 0.6);
+      xFace - 0.2, 3.15, zc, -Math.PI / 2, 1.9, 0.54);
     this.exitSignMat = sign.material;
     // 门内灯光
     const glowPlane = new THREE.Mesh(new THREE.PlaneGeometry(3.0, 2.4),
@@ -1028,7 +1056,7 @@ export class World {
     // 绿色应急灯
     const lamp = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.12, 0.5),
       new THREE.MeshStandardMaterial({ color: 0x9dffc0, emissive: 0x57ff9b, emissiveIntensity: 2 }));
-    lamp.position.set(xFace - 0.3, 3.05, zc + 2.2);
+    lamp.position.set(xFace - 0.3, 2.9, zc + 1.35); // 原来在墙格里（zc+2.2 已经出格），根本看不见
     g.add(lamp);
     this.group.add(g);
     this.exitInfo = {

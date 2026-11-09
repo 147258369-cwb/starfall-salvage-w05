@@ -1,0 +1,188 @@
+  function drawMilkFrogSticker(g) {
+    /* 按 assets/models/nailong_colored_2.0.glb 的实际造型重画：
+     * 直立、梨形大肚子、头与身体连成一体（没有脖子）、
+     * 两只绿色小眼睛长在头顶两侧、嘴是一条细横线、
+     * 短粗胳膊垂在身侧、短腿大脚。
+     * 比例照模型正面视图量：总高约 1.87，头宽约为肚子宽的 0.45。
+     * 保留 1999 年幼儿园手绘海报的手感：线条略歪、套色错位、压纸纹。
+     */
+    const SKIN = '#d7a267';
+    const SKIN_LIGHT = '#eecb92';
+    const SKIN_DARK = '#b3803e';
+    const BELLY = '#e9cba0';
+    const IRIS = '#4f8a3a';
+    const ink = (a) => 'rgba(86,58,24,' + a + ')';
+
+    g.save();
+    g.translate(256, 250);
+    g.rotate(-0.03);
+
+    /* 地面影子 */
+    g.save();
+    g.globalAlpha = 0.17;
+    g.fillStyle = '#6a4c1e';
+    g.beginPath();
+    g.ellipse(0, 106, 58, 11, 0, 0, TAU);
+    g.fill();
+    g.restore();
+
+    /* 腿与脚（先画，藏在身体后面） */
+    for (let s = -1; s <= 1; s += 2) {
+      g.save();
+      g.beginPath();
+      g.moveTo(s * 11, 58);
+      g.bezierCurveTo(s * 17, 76, s * 19, 90, s * 17, 100);
+      g.lineTo(s * 35, 100);
+      g.bezierCurveTo(s * 35, 86, s * 34, 70, s * 30, 56);
+      g.closePath();
+      g.fillStyle = '#c4914c';
+      g.fill();
+      g.strokeStyle = ink(0.28);
+      g.lineWidth = 1.8;
+      g.stroke();
+      g.beginPath();
+      g.ellipse(s * 27, 105, 21, 9, s * 0.05, 0, TAU);
+      g.fillStyle = SKIN;
+      g.fill();
+      g.strokeStyle = ink(0.32);
+      g.lineWidth = 1.6;
+      g.stroke();
+      for (const t of [-1, 0, 1]) dot(g, s * 27 + t * 8, 108, 2.6, ink(0.4), 1);
+      g.restore();
+    }
+
+    /* 胳膊 */
+    for (let s = -1; s <= 1; s += 2) {
+      g.save();
+      g.lineCap = 'round';
+      g.strokeStyle = ink(0.3);
+      g.lineWidth = 21;
+      g.beginPath();
+      g.moveTo(s * 49, -18);
+      g.quadraticCurveTo(s * 62, 14, s * 56, 40);
+      g.stroke();
+      g.strokeStyle = SKIN;
+      g.lineWidth = 17;
+      g.beginPath();
+      g.moveTo(s * 49, -18);
+      g.quadraticCurveTo(s * 62, 14, s * 56, 40);
+      g.stroke();
+      g.beginPath();
+      g.arc(s * 56, 45, 8.5, 0, TAU);
+      g.fillStyle = SKIN;
+      g.fill();
+      g.strokeStyle = ink(0.3);
+      g.lineWidth = 1.6;
+      g.stroke();
+      g.restore();
+    }
+
+    /* 身体：头 - 肩 - 肚子 - 臀，一条连续曲线 */
+    const bodyPath = () => {
+      g.beginPath();
+      g.moveTo(0, -98);
+      g.bezierCurveTo(18, -98, 29, -88, 32, -68);
+      g.bezierCurveTo(39, -52, 50, -34, 57, -4);
+      g.bezierCurveTo(63, 26, 55, 52, 38, 66);
+      g.bezierCurveTo(26, 76, 14, 79, 0, 79);
+      g.bezierCurveTo(-14, 79, -26, 76, -38, 66);
+      g.bezierCurveTo(-55, 52, -63, 26, -57, -4);
+      g.bezierCurveTo(-50, -34, -39, -52, -32, -68);
+      g.bezierCurveTo(-29, -88, -18, -98, 0, -98);
+      g.closePath();
+    };
+
+    /* 丝网印套色错位：先压一层暖影子 */
+    g.save();
+    g.translate(3, 3);
+    bodyPath();
+    g.fillStyle = 'rgba(196,132,52,0.18)';
+    g.fill();
+    g.restore();
+
+    const bodyG = g.createLinearGradient(-58, -90, 58, 70);
+    bodyG.addColorStop(0, SKIN_LIGHT);
+    bodyG.addColorStop(0.42, SKIN);
+    bodyG.addColorStop(1, SKIN_DARK);
+    bodyPath();
+    g.fillStyle = bodyG;
+    g.fill();
+    g.strokeStyle = ink(0.42);
+    g.lineWidth = 2.4;
+    g.lineJoin = 'round';
+    g.stroke();
+
+    /* 皮肤纹理：手点的小斑点 + 左上高光 + 下缘压暗 */
+    g.save();
+    bodyPath();
+    g.clip();
+    const skinRnd = mulberry32(hashSeed('poster-frog-skin'));
+    for (let i = 0; i < 40; i++) {
+      const a = skinRnd() * TAU;
+      const d = Math.sqrt(skinRnd()) * 62;
+      dot(g, Math.cos(a) * d, 4 + Math.sin(a) * d * 0.85, 1.4 + skinRnd() * 3,
+        skinRnd() > 0.5 ? '#f3d6a2' : '#b98746', 0.14 + skinRnd() * 0.18);
+    }
+    const hl = g.createRadialGradient(-26, -66, 0, -26, -66, 62);
+    hl.addColorStop(0, 'rgba(255,246,220,0.26)');
+    hl.addColorStop(1, 'rgba(255,246,220,0)');
+    g.fillStyle = hl;
+    g.fillRect(-70, -100, 140, 200);
+    const ao = g.createLinearGradient(0, 40, 0, 80);
+    ao.addColorStop(0, 'rgba(150,104,36,0)');
+    ao.addColorStop(1, 'rgba(150,104,36,0.24)');
+    g.fillStyle = ao;
+    g.fillRect(-70, 40, 140, 42);
+    g.restore();
+
+    /* 大肚子 */
+    const bellyG = g.createRadialGradient(-8, 18, 4, 0, 34, 58);
+    bellyG.addColorStop(0, BELLY);
+    bellyG.addColorStop(1, 'rgba(233,203,160,0.35)');
+    g.beginPath();
+    g.ellipse(0, 32, 46, 38, 0, 0, TAU);
+    g.fillStyle = bellyG;
+    g.fill();
+    g.strokeStyle = 'rgba(150,112,50,0.22)';
+    g.lineWidth = 1.5;
+    g.stroke();
+
+    /* 绿色小眼睛：长在头顶两侧 */
+    for (let s = -1; s <= 1; s += 2) {
+      const ex = s * 15;
+      const ey = -74;
+      const er = 10.5;
+      const irisG = g.createRadialGradient(ex - er * 0.3, ey - er * 0.4, er * 0.1, ex, ey, er);
+      irisG.addColorStop(0, '#9cc06a');
+      irisG.addColorStop(0.6, IRIS);
+      irisG.addColorStop(1, '#3f6b2c');
+      g.beginPath();
+      g.arc(ex, ey, er, 0, TAU);
+      g.fillStyle = irisG;
+      g.fill();
+      g.strokeStyle = ink(0.34);
+      g.lineWidth = 1.6;
+      g.stroke();
+      g.beginPath();
+      g.ellipse(ex, ey + 0.8, er * 0.42, er * 0.72, 0, 0, TAU);
+      g.fillStyle = '#161009';
+      g.fill();
+      dot(g, ex - er * 0.34, ey - er * 0.42, er * 0.2, '#fffbe8', 0.85);
+    }
+
+    /* 嘴：一条细横线 */
+    g.save();
+    g.strokeStyle = 'rgba(58,32,20,0.78)';
+    g.lineWidth = 2.6;
+    g.lineCap = 'round';
+    g.beginPath();
+    g.moveTo(-11, -50);
+    g.quadraticCurveTo(0, -47.5, 11, -50);
+    g.stroke();
+    g.restore();
+
+    /* 鼻孔 */
+    for (let s = -1; s <= 1; s += 2) dot(g, s * 4, -60, 1.6, 'rgba(70,50,24,0.5)', 1);
+
+    g.restore();
+  }
