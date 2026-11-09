@@ -160,6 +160,7 @@ export class World {
       }
     }
     this.wallCells = wallCells;
+    this.wallMeshes = [];   // 贴墙吸附用：海报按法线找最近的墙
     const wallGeo = new THREE.BoxGeometry(C, WH, C);
     wallByZone.forEach((cells, zz) => {
       const mat = new THREE.MeshStandardMaterial({
@@ -174,6 +175,7 @@ export class World {
         im.setMatrixAt(i, dummy.matrix);
       });
       im.instanceMatrix.needsUpdate = true;
+      this.wallMeshes.push(im);
       this.group.add(im);
     });
   }
@@ -196,19 +198,23 @@ export class World {
           for (const s of [-1, 1]) {
             const p = new THREE.Mesh(new THREE.BoxGeometry(0.3, postH, postW), frameMat);
             p.position.set(bx + dx * 0.05, postH / 2, bz + s * (C / 2 - postW / 2));
+            p.userData.channelIgnore = true;   // 门框本来就嵌在墙里，内部通道别报穿墙
             this.group.add(p);
           }
           const lintel = new THREE.Mesh(new THREE.BoxGeometry(0.34, 0.34, C - 0.1), frameMat);
           lintel.position.set(bx + dx * 0.05, 2.9, bz);
+          lintel.userData.channelIgnore = true;
           this.group.add(lintel);
         } else {
           for (const s of [-1, 1]) {
             const p = new THREE.Mesh(new THREE.BoxGeometry(postW, postH, 0.3), frameMat);
             p.position.set(bx + s * (C / 2 - postW / 2), postH / 2, bz + dz * 0.05);
+            p.userData.channelIgnore = true;
             this.group.add(p);
           }
           const lintel = new THREE.Mesh(new THREE.BoxGeometry(C - 0.1, 0.34, 0.34), frameMat);
           lintel.position.set(bx, 2.9, bz + dz * 0.05);
+          lintel.userData.channelIgnore = true;
           this.group.add(lintel);
         }
       }
@@ -235,19 +241,39 @@ export class World {
     this.group.add(m);
     return m;
   }
+  // 沿海报背面法线找最近的墙，返回需要往墙方向推的距离。
+  // 调用点给的坐标常常离墙 0.17-0.24 m（例如 6.94 * C 想写"贴墙"），
+  // 推过去之后画框背面正好贴住墙面。找不到墙就原地不动。
+  wallSnap(x, z, ry, back = 0.0295) {
+    if (!this.wallMeshes || !this.wallMeshes.length) return 0;
+    const ray = new THREE.Raycaster();
+    ray.set(new THREE.Vector3(x, 1.7, z), new THREE.Vector3(-Math.sin(ry), 0, -Math.cos(ry)));
+    ray.far = 0.4;
+    const hits = ray.intersectObjects(this.wallMeshes, false);
+    if (!hits.length) return 0;
+    const shift = hits[0].distance - back;
+    return Math.max(0, Math.min(0.35, shift));
+  }
   addPoster(kind, x, y, z, ry, w = 1.45, h = 2.1, textures = this.tex) {
     const mat = new THREE.MeshStandardMaterial({
       map: textures.poster(kind), roughness: 1, metalness: 0,
       emissive: 0xffffff, emissiveMap: textures.poster(kind), emissiveIntensity: 0.12,
       side: THREE.DoubleSide,
     });
+    let px = x, pz = z;
+    const snap = this.wallSnap(x, z, ry);
+    if (snap > 0) {
+      // 往墙方向（-法线）推：法线 = (sin(ry), 0, cos(ry))
+      px = x - Math.sin(ry) * snap;
+      pz = z - Math.cos(ry) * snap;
+    }
     const m = new THREE.Mesh(new THREE.PlaneGeometry(w, h), mat);
-    m.position.set(x, y, z);
+    m.position.set(px, y, pz);
     m.rotation.y = ry;
     m.translateZ(0.045);
     this.group.add(m);
     const frame = new THREE.Mesh(new THREE.BoxGeometry(w + 0.1, h + 0.1, 0.035), MAT.woodDark);
-    frame.position.set(x, y, z);
+    frame.position.set(px, y, pz);
     frame.rotation.y = ry;
     frame.translateZ(-0.012);
     this.group.add(frame);
@@ -289,7 +315,7 @@ export class World {
   addTable(cx, cz, w = 1.8, d = 0.9, ry = 0, height = 0.66) {
     const [x, z] = [(cx + 0.5) * C, (cz + 0.5) * C];
     this.addBox(w, 0.09, d, MAT.desk, x, height, z, ry, true);
-    const legH = height - 0.09;
+    const legH = height - 0.045; // 台面中心在 height，底面在 height-0.045；腿顶必须正好顶到它
     const off = [[-1, -1], [1, -1], [-1, 1], [1, 1]];
     for (const [sx, sz] of off) {
       const lx = x + Math.cos(ry) * (sx * (w / 2 - 0.12)) - Math.sin(ry) * (sz * (d / 2 - 0.12));
@@ -312,10 +338,11 @@ export class World {
   }
   addBed(cx, cz) {
     const [x, z] = [(cx + 0.5) * C, (cz + 0.5) * C];
-    this.addBox(1.5, 0.18, 2.0, MAT.wood, x, 0.24, z, 0, true);
-    this.addBox(1.38, 0.16, 1.86, MAT.mattress, x, 0.4, z);
-    this.addBox(0.66, 0.13, 0.36, MAT.white, x, 0.52, z - 0.72);
-    this.addBox(1.38, 0.06, 0.9, MAT.blue, x, 0.49, z + 0.42);
+    // 床没有床腿，床架底面必须贴地（半高 0.09）；原来整张床悬空 0.15 m，其余部件跟着下移
+    this.addBox(1.5, 0.18, 2.0, MAT.wood, x, 0.09, z, 0, true);
+    this.addBox(1.38, 0.16, 1.86, MAT.mattress, x, 0.25, z);
+    this.addBox(0.66, 0.13, 0.36, MAT.white, x, 0.37, z - 0.72);
+    this.addBox(1.38, 0.06, 0.9, MAT.blue, x, 0.34, z + 0.42);
   }
   addPlant(cx, cz, scale = 1) {
     const [x, z] = [(cx + 0.5) * C, (cz + 0.5) * C];
@@ -336,8 +363,10 @@ export class World {
     b.position.set(x, y, z);
     b.scale.set(1, 1.18, 1);
     this.group.add(b);
+    b.userData.channelFloatOk = true;   // 气球本来就是吊着的，体检模式别报悬空
     const str = new THREE.Mesh(new THREE.CylinderGeometry(0.005, 0.005, 1.1, 4), MAT.white);
     str.position.set(x, y - 0.72, z);
+    str.userData.channelFloatOk = true;
     this.group.add(str);
   }
   addRug(cx, cz, w, d, color = 0x7a3535, border = 0x3a2222) {
@@ -371,6 +400,7 @@ export class World {
       const b = new THREE.Mesh(new THREE.SphereGeometry(0.12, 8, 6),
         new THREE.MeshStandardMaterial({ color: colors[i % colors.length], roughness: 0.4 }));
       b.position.set(x + Math.cos(a) * rr, 0.43 + Math.random() * 0.14, z + Math.sin(a) * rr);
+      b.userData.channelFloatOk = true;   // 海洋球本来就堆在池子里，别报悬空
       this.group.add(b);
     }
     this.addObstacle(x, z, 1.3, 1.3);
@@ -379,15 +409,19 @@ export class World {
     const [x, z] = [(cx + 0.5) * C, (cz + 0.5) * C];
     const paint = new THREE.MeshStandardMaterial({ color: 0xd85b5b, roughness: 0.5, metalness: 0.3 });
     const tire = MAT.black;
+    const parts = [];
     for (const [ox, oz, r] of [[-0.55, 0, 0.24], [0.55, 0, 0.24], [0.58, 0, 0.18]]) {
       const w = new THREE.Mesh(new THREE.TorusGeometry(r, 0.055, 6, 14), tire);
       w.position.set(x + ox, r + 0.02, z + oz);
       this.group.add(w);
+      parts.push(w);
     }
-    this.addBox(0.9, 0.08, 0.08, paint, x, 0.42, z, 0);
-    this.addBox(0.08, 0.5, 0.08, paint, x - 0.42, 0.66, z, 0.12);
-    this.addBox(0.28, 0.06, 0.12, MAT.black, x - 0.42, 0.94, z);
-    this.addBox(0.4, 0.07, 0.12, paint, x + 0.1, 0.34, z);
+    parts.push(this.addBox(0.9, 0.08, 0.08, paint, x, 0.42, z, 0));
+    parts.push(this.addBox(0.08, 0.5, 0.08, paint, x - 0.42, 0.66, z, 0.12));
+    parts.push(this.addBox(0.28, 0.06, 0.12, MAT.black, x - 0.42, 0.94, z));
+    parts.push(this.addBox(0.4, 0.07, 0.12, paint, x + 0.1, 0.34, z));
+    // 三轮车是复合道具：车架由轮子支撑，单看车架会误报悬空
+    for (const m of parts) m.userData.channelFloatOk = true;
     this.addObstacle(x, z, 0.75, 0.4);
   }
   addWallClock(x, y, z, ry) {
@@ -450,13 +484,17 @@ export class World {
     // 接待台
     const [rx, rz] = this.addTable(3.3, 1.95, 2.5, 1.0, 0, 0.92);
     this.addBox(2.5, 0.9, 0.1, MAT.desk, rx, 0.5, rz - 0.45);
-    this.addChair(3.3, 1.35, Math.PI);
+    this.addChair(3.3, 1.70, Math.PI); // 贴接待台前沿，原来离桌 1.1m
     // 门头招牌
     this.addSign('奶蛙乐园', { sub: 'MILK FROG PARK · EST. 1987' }, 3.5 * C, 2.72, 3.24, 0, 2.6, 0.8);
     // 长椅
-    this.addBox(0.6, 0.12, 2.0, MAT.wood, 1.75 * C, 0.5, 4.7 * C, 0);
-    this.addBox(0.08, 0.5, 0.08, MAT.woodDark, 1.75 * C, 0.25, 3.9 * C);
-    this.addBox(0.08, 0.5, 0.08, MAT.woodDark, 1.75 * C, 0.25, 5.5 * C);
+    // 长椅：腿按座面算，别写成座面外的常量（原来两腿离座面 1.56 m）
+    {
+      const bx = 1.75 * C, bz = 4.7 * C;
+      this.addBox(0.6, 0.12, 2.0, MAT.wood, bx, 0.5, bz, 0);            // 座面 0.44-0.56
+      this.addBox(0.08, 0.44, 0.08, MAT.woodDark, bx, 0.22, bz - 0.86); // 腿 0-0.44
+      this.addBox(0.08, 0.44, 0.08, MAT.woodDark, bx, 0.22, bz + 0.86);
+    }
     this.addObstacle(1.75 * C, 4.7 * C, 0.35, 1.05);
     // 鞋柜
     this.addBox(0.9, 1.15, 0.42, MAT.woodLight, 1.65 * C, 0.58, 2.03 * C, 0, true);
@@ -486,7 +524,7 @@ export class World {
     // 黑板
     this.addBox(4.4, 1.75, 0.08, MAT.board, 13.5 * C, 1.76, 1.04 * C);
     this.addBox(4.5, 0.08, 0.16, MAT.woodDark, 13.5 * C, 0.9, 1.08 * C);
-    this.addBox(0.16, 0.9, 0.06, MAT.white, 15.6 * C, 1.65, 1.08 * C); // 粉笔槽粉笔
+    this.addBox(0.16, 0.03, 0.03, MAT.white, 44.2, 0.955, 1.08 * C); // 粉笔：躺在粉笔槽上（槽顶 0.94）
     this.addPoster('drawing', 11.04 * C, 1.78, 3.2 * C, Math.PI / 2, 1.65, 2.2);
     this.addPoster('rules', 12.0 * C, 1.72, 6.94 * C, Math.PI, 1.5, 2.1);
     // 讲台
@@ -495,8 +533,15 @@ export class World {
     this.addTable(12.3, 3.7, 1.5, 0.8, 0.05);
     this.addTable(15.0, 3.8, 1.5, 0.8, -0.04);
     this.addTable(13.6, 5.35, 1.5, 0.8, 0.02);
-    for (const [cx, cz] of [[12.3, 3.0], [12.3, 4.45], [15.0, 3.1], [15.0, 4.55], [13.6, 4.65], [13.6, 6.05], [14.4, 5.35]]) {
-      this.addChair(cx, cz, Math.PI);
+    // 椅子要贴课桌前沿：桌深 0.8（半深 0.4），座面半宽 0.275，留 0.02 余量。
+    // ry = PI 表示椅背朝 -Z（坐在桌北侧），ry = 0 表示朝 +Z（坐在桌南侧）。
+    for (const [cx, cz, ry] of [
+      [12.3, 3.48, Math.PI], [12.3, 3.92, 0],
+      [15.0, 3.58, Math.PI], [15.0, 4.02, 0],
+      [13.6, 5.13, Math.PI], [13.6, 5.57, 0],
+      [13.92, 5.35, Math.PI / 2],
+    ]) {
+      this.addChair(cx, cz, ry);
     }
     // 玩具柜与书架
     this.addBox(0.5, 1.7, 2.2, MAT.woodLight, 16.64 * C, 0.85, 4.4 * C, 0, true);
@@ -505,12 +550,15 @@ export class World {
       this.addBox(0.34, 0.32, 0.95, new THREE.MeshStandardMaterial({ color: [0xd9a7e0, 0x8fb7dd, 0xf29fb0][i], roughness: 0.9 }),
         16.55 * C, 0.55 + i * 0.55, 2.4 * C, 0);
     }
-    // 地球仪
-    this.addCyl(0.1, 0.14, 0.08, 10, MAT.woodDark, 15.4 * C, 1.02, 1.85 * C);
-    const globe = new THREE.Mesh(new THREE.SphereGeometry(0.18, 14, 10),
-      new THREE.MeshStandardMaterial({ color: 0x6f93b8, roughness: 0.5 }));
-    globe.position.set(15.4 * C, 1.24, 1.85 * C);
-    this.group.add(globe);
+    // 地球仪放在讲台上（台面顶 0.845）；原来用 15.4 * C 是格线，离桌心 2.26 m 且悬空
+    {
+      const gx = (15.4 + 0.5) * C, gz = (1.85 + 0.5) * C;
+      this.addCyl(0.1, 0.14, 0.08, 10, MAT.woodDark, gx, 0.885, gz);
+      const globe = new THREE.Mesh(new THREE.SphereGeometry(0.18, 14, 10),
+        new THREE.MeshStandardMaterial({ color: 0x6f93b8, roughness: 0.5 }));
+      globe.position.set(gx, 1.1, gz);
+      this.group.add(globe);
+    }
     // 彩旗
     for (let i = 0; i < 12; i++) {
       const t = i / 11;
@@ -540,14 +588,17 @@ export class World {
 
   buildOffice() {
     this.addTable(23.3, 2.1, 2.4, 1.0, 0, 0.78);
-    this.addChair(23.3, 1.4, Math.PI);
+    this.addChair(23.3, 1.85, Math.PI); // 贴办公桌前沿，原来离桌 1.5m
     this.addBox(0.9, 1.75, 0.55, MAT.metalDark, 21.55 * C, 0.88, 1.9 * C, 0, true);
     this.addBox(0.72, 0.8, 0.72, MAT.metal, 24.8 * C, 0.4, 5.25 * C, 0.2, true);
     this.addPoster('missing', 21.06 * C, 1.72, 3.7 * C, Math.PI / 2, 1.3, 1.9);
     this.addBox(1.0, 0.55, 1.0, MAT.fabric, 24.6 * C, 0.28, 3.1 * C, 0, true);
-    // 台灯
-    this.addCyl(0.16, 0.2, 0.06, 12, MAT.metal, 22.35 * C, 1.55, 2.0 * C);
-    this.addBox(0.05, 0.5, 0.05, MAT.metalDark, 22.35 * C, 1.3, 2.0 * C);
+    // 台灯：放在桌面上（桌高 0.78，台面顶 0.825）。原来整盏灯悬在离桌 5 m 的空中
+    {
+      const lampX = (23.0 + 0.5) * C, lampZ = (2.0 + 0.5) * C, deskTop = 0.78 + 0.045;
+      this.addBox(0.05, 0.42, 0.05, MAT.metalDark, lampX, deskTop + 0.21, lampZ);
+      this.addCyl(0.16, 0.2, 0.06, 12, MAT.metal, lampX, deskTop + 0.45, lampZ);
+    }
     this.addLightPool(23.3 * C, 3.3 * C, 6, 0xffcf9a, 0.12);
   }
 
@@ -562,24 +613,39 @@ export class World {
     this.addGlowSprite(1.55 * C, 0.42, 11.55 * C, 1.1, 0x9fc6ff, 0.4);
     // 摇椅
     // 摇椅（要给碰撞，否则玩家直接穿过去）
-    this.addBox(0.6, 0.1, 0.9, MAT.wood, 5.8 * C, 0.45, 11.8 * C, 0.4, true);
-    this.addBox(0.6, 0.7, 0.08, MAT.wood, 5.8 * C, 0.85, 12.15 * C, 0.4);
+    // 摇椅：靠背贴着座面后端（沿局部 +Z 挪 0.49 = 座面半深 0.45 + 靠背半厚 0.04）
+    {
+      const rkx = 5.8 * C, rkz = 11.8 * C, rkry = 0.4;
+      this.addBox(0.6, 0.1, 0.9, MAT.wood, rkx, 0.45, rkz, rkry, true);   // 座面 0.40-0.50
+      this.addBox(0.6, 0.7, 0.08, MAT.wood,
+        rkx + Math.sin(rkry) * 0.49, 0.85, rkz + Math.cos(rkry) * 0.49, rkry); // 靠背 0.50-1.20
+      // 摇椅原来没有腿，整把椅子悬空 0.40 m；补四条腿顶住座面底
+      const cs = Math.cos(rkry), sn = Math.sin(rkry);
+      for (const [lx, lz] of [[-0.22, -0.34], [0.22, -0.34], [-0.22, 0.34], [0.22, 0.34]]) {
+        this.addBox(0.06, 0.40, 0.06, MAT.woodDark,
+          rkx + lx * cs + lz * sn, 0.20, rkz - lx * sn + lz * cs, rkry);
+      }
+    }
     // 玩具箱 / 地毯 / 窗帘 / 毛绒玩具
     this.addBox(1.0, 0.55, 0.6, MAT.pink, 3.6 * C, 0.28, 17.7 * C, 0, true);
     this.addRug(3.6, 15.4, 4.0, 3.0, 0x3e4f63, 0x25313f);
     for (const zz of [12.6, 14.8, 17.0]) {
-      this.addBox(0.07, 2.15, 1.35, MAT.fabric, 1.12 * C, 1.42, zz * C, 0);
+      this.addBox(0.07, 2.15, 1.35, MAT.fabric, 3.235, 2.375, zz * C, 0); // 贴西墙(x=3.2)、顶接天花(3.45)
     }
     const plush = new THREE.Mesh(new THREE.SphereGeometry(0.16, 10, 8), MAT.cream);
-    plush.position.set(2.1 * C, 0.62, 14.3 * C);
+    plush.position.set((1.95 + 0.5) * C, 0.33 + 0.16, 12.9 * C); // 坐在床垫上（床垫顶 0.33），原来悬空 0.47 m 落在过道
     this.group.add(plush);
     this.addLightPool(3.5 * C, 14.8 * C, 8.5, 0x9fc6ff, 0.2);
   }
 
   buildCanteen() {
     const [tx, tz] = this.addTable(13.5, 14.3, 4.2, 1.5, 0, 0.94);
-    for (const [cx, cz] of [[12.0, 13.3], [13.5, 13.3], [15.0, 13.3], [12.0, 15.3], [13.5, 15.3], [15.0, 15.3]]) {
-      this.addChair(cx, cz, 0);
+    // 长桌 4.2 x 1.5（半深 0.75），椅子贴桌沿；原来离桌 2.2-3.3 m，像立在房间中间。
+    for (const [cx, cz, ry] of [
+      [13.09, 13.97, Math.PI], [13.50, 13.97, Math.PI], [13.91, 13.97, Math.PI],
+      [13.09, 14.63, 0], [13.50, 14.63, 0], [13.91, 14.63, 0],
+    ]) {
+      this.addChair(cx, cz, ry);
     }
     // 蛋糕
     const cake = new THREE.Group();
@@ -610,7 +676,7 @@ export class World {
     this.addBox(0.06, 1.05, 4.0, MAT.cream, 15.77 * C, 0.52, 16.1 * C);
     // 冰箱
     this.addBox(1.0, 1.9, 1.0, MAT.cream, 16.2 * C, 0.95, 12.2 * C, 0, true);
-    this.addBox(0.05, 0.5, 0.1, MAT.metal, 15.68 * C, 1.4, 12.2 * C);
+    this.addBox(0.05, 0.5, 0.1, MAT.metal, 16.2 * C - 0.5 - 0.025, 1.4, 12.2 * C); // 贴冰箱正面，原来悬在冰箱前 1.15 m
     // 气球与彩旗
     this.addBalloon(12.2, 12.1, 2.55, 0xf2a9b8);
     this.addBalloon(15.7, 17.5, 2.35, 0xa9d6c4);
@@ -623,19 +689,29 @@ export class World {
     cloth.position.set(tx, 0.995, tz);
     cloth.rotation.x = -Math.PI / 2;
     this.group.add(cloth);
-    for (const [cx, cz] of [[12.3, 14.2], [14.7, 14.4], [13.0, 13.5], [15.1, 14.9]]) {
-      this.addCyl(0.09, 0.07, 0.22, 8, MAT.pink, cx * C, 1.08, cz * C);
-    }
-    for (let i = 0; i < 4; i++) {
-      this.addPartyHat(11.8 + i * 1.1, 13.2 + (i % 2) * 1.9, 1.0, [0xf29fb0, 0xffd9a0, 0xa9d6c4, 0x8fb7dd][i]);
+    // 纸杯和派对帽都要摆在桌面上。原来纸杯写成 cx * C（格线，不是格心，整体偏 2.26 m），
+    // 派对帽的格子也在桌外；这里改成相对桌心的偏移，并在蛋糕半径 0.66 之外。
+    {
+      const tableTop = 0.94 + 0.045;
+      for (const [ox, oz] of [[-1.6, -0.28], [1.4, -0.24], [-1.2, 0.35], [1.15, 0.38]]) {
+        this.addCyl(0.09, 0.07, 0.22, 8, MAT.pink, tx + ox, tableTop + 0.11, tz + oz);
+      }
+      for (let i = 0; i < 4; i++) {
+        this.addPartyHat(13.05 + i * 0.34, 14.18 + (i % 2) * 0.3, tableTop,
+          [0xf29fb0, 0xffd9a0, 0xa9d6c4, 0x8fb7dd][i]);
+      }
     }
   }
 
   buildExitHall() {
     this.addLockers(21.06, 14.2, Math.PI / 2, 3, 2.0);
-    this.addBox(2.4, 0.12, 0.5, MAT.wood, 23.0 * C, 0.5, 17.65 * C, 0, true);
-    this.addBox(0.08, 0.5, 0.08, MAT.woodDark, 22.0 * C, 0.25, 17.65 * C);
-    this.addBox(0.08, 0.5, 0.08, MAT.woodDark, 24.0 * C, 0.25, 17.65 * C);
+    // 长椅腿按座面两端算（原来两腿在座面外 2.0 m）
+    {
+      const bx = 23.0 * C, bz = 17.65 * C;
+      this.addBox(2.4, 0.12, 0.5, MAT.wood, bx, 0.5, bz, 0, true);
+      this.addBox(0.08, 0.44, 0.08, MAT.woodDark, bx - 1.05, 0.22, bz);
+      this.addBox(0.08, 0.44, 0.08, MAT.woodDark, bx + 1.05, 0.22, bz);
+    }
     // 灭火器
     this.addCyl(0.11, 0.11, 0.55, 10, MAT.red, 25.3 * C, 0.3, 11.6 * C);
     this.addBox(0.16, 0.1, 0.16, MAT.metalDark, 25.3 * C, 0.62, 11.6 * C);
@@ -653,10 +729,14 @@ export class World {
 
   buildCorridorDecor() {
     // 主走廊：长椅（靠北墙）、植物、饮水机、海报
-    this.addBox(0.55, 0.1, 1.9, MAT.wood, 22.4, 0.48, 26.7, 0);
-    this.addBox(0.06, 0.48, 0.06, MAT.woodDark, 21.65, 0.24, 26.7);
-    this.addBox(0.06, 0.48, 0.06, MAT.woodDark, 23.15, 0.24, 26.7);
-    this.addObstacle(22.4, 26.7, 0.3, 1.0);
+    // 走廊长椅贴北墙：统一用格子写法，腿顶要接住座面底（原来外溢 0.48 m）
+    {
+      const bx = 7.0 * C, bz = 8.34 * C;
+      this.addBox(0.55, 0.1, 1.9, MAT.wood, bx, 0.48, bz, 0);            // 座面 0.43-0.53
+      this.addBox(0.06, 0.43, 0.06, MAT.woodDark, bx, 0.215, bz - 0.82);
+      this.addBox(0.06, 0.43, 0.06, MAT.woodDark, bx, 0.215, bz + 0.82);
+      this.addObstacle(bx, bz, 0.3, 1.0);
+    }
     this.addPlant(2.4, 8.35, 0.95);
     this.addPlant(23.8, 8.35, 0.9);
     this.addPlant(8.35, 11.1, 0.85);
@@ -672,8 +752,8 @@ export class World {
     this.addPoster('missing', 12.3 * C, 1.7, 9.96 * C, Math.PI, 1.2, 1.75);
     this.addPoster('map', 21.4 * C, 1.7, 9.96 * C, Math.PI, 1.55, 1.2);
     // 中央走廊：储物柜、告示
-    this.addLockers(8.12, 5.2, 0, 2, 1.9);
-    this.addPoster('rules', 8.06 * C, 1.7, 15.7 * C, Math.PI / 2, 1.3, 1.85);
+    this.addLockers(7.58, 5.2, 0, 2, 1.9); // 贴中央走廊西墙（x=25.6），原来立在 6.4 m 宽走廊的正中间
+    this.addPoster('rules', 8.06 * C, 1.7, 16.6 * C, Math.PI / 2, 1.3, 1.85); // 原来 15.7 格整张被门框/柜体吞掉
     this.addPoster('frog', 9.94 * C, 1.75, 3.2 * C, -Math.PI / 2, 1.3, 1.85);
     // 小椅子
     this.addChair(9.3, 10.6, Math.PI * 0.7);

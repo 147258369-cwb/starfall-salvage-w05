@@ -11,6 +11,7 @@ import { AudioManager, HALLUCINATION_DURATION } from './audio.js';
 import { UI } from './ui.js';
 import { Story } from './story.js';
 import { Demo } from './demo.js';
+import { InternalChannel } from './inspect.js';
 
 const C = GRID.cell;
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -45,6 +46,7 @@ class Game {
     this.muted = false;
     this.sensMultiplier = 1; // 画面灵敏度倍率（1 = 默认）
     this.pendingMenuMusic = true;
+    this.channel = null;   // 内部通道（无怪物体检模式）
     window.__game = this;
     try {
       const v = localStorage.getItem('mfp.volume');
@@ -92,14 +94,15 @@ class Game {
       this.renderer.setSize(innerWidth, innerHeight);
     });
     this.canvas.addEventListener('click', () => {
-      if (this.state === 'playing' && !document.pointerLockElement) this.requestLock();
+      if ((this.state === 'playing' || this.state === 'internal') && !document.pointerLockElement) this.requestLock();
     });
     this.canvas.addEventListener('contextmenu', (e) => e.preventDefault());
     document.addEventListener('pointerlockchange', () => {
       const locked = document.pointerLockElement === this.canvas;
-      this.player.lookEnabled = locked && this.state === 'playing';
+      this.player.lookEnabled = locked && (this.state === 'playing' || this.state === 'internal');
       if (locked) this.player.onLockAcquire();
       if (!locked && this.state === 'playing') this.pause();
+      if (this.state === 'internal') this.channel?.hint?.classList.toggle('hidden', locked);
     });
     window.addEventListener('keydown', (e) => this.onKey(e));
     const suspendOnBlur = () => {
@@ -132,6 +135,7 @@ class Game {
     ui.on('sensitivity', (v) => this.setSensitivity(v));
     ui.on('pause', () => this.pause());
     ui.on('skip', () => this.skipStory());
+    ui.on('internal', () => this.startInternal());
     ui.setVolume(this.volume);
     ui.setSensitivity(this.sensMultiplier);
     ui.setSoundMuted(this.muted);
@@ -206,6 +210,11 @@ class Game {
     this.audio.setVolume(this.volume);
     if (this.muted && !this.audio.muted) this.audio.toggleMute();
     this.audio.playMusic('music_menu', { fade: 2.2 });
+    this.channel = new InternalChannel(this);
+    try {
+      const q = new URLSearchParams(location.search);
+      if (q.has('channel') || q.get('inspect') === '1') this.startInternal({ instant: true });
+    } catch (e) { /* ignore */ }
   }
 
   onFirstGesture() {
@@ -300,6 +309,28 @@ class Game {
     this._starting = false;
   }
 
+  // ---------------- 内部通道（无怪物体检模式） ----------------
+  async startInternal({ instant = false } = {}) {
+    if (this._starting) return;
+    if (!instant && this.state !== 'menu') return;
+    this._starting = true;
+    this.pendingMenuMusic = false;
+    this.ui.el.menu.classList.add('hidden');
+    this.ui.hideLoading();
+    if (!instant) await this.ui.fadeOut(320);
+    this.resetStage(false);       // 重置奶片/龙奶/出口，但随后奶蛙会被通道藏起来
+    this.channel.enter();
+    if (!instant) await this.ui.fadeIn(320);
+    this._starting = false;
+  }
+
+  leaveInternal() {
+    if (this.state !== 'internal') return false;
+    this.channel?.exit();
+    this.goMenu();
+    return true;
+  }
+
   async startDemo() {
     if (this.state !== 'menu' || this._starting) return;
     this._starting = true;
@@ -388,6 +419,7 @@ class Game {
   }
 
   goMenu() {
+    if (this.state === 'internal') { this.channel?.exit(); }
     this.demo.stop();
     this.player.bot = null;
     this.player.lookEnabled = false;
@@ -424,6 +456,11 @@ class Game {
   // ---------------- 事件 ----------------
   onKey(e) {
     const k = e.key.toLowerCase();
+    if (this.state === 'internal') {
+      if (k === 'm') this.toggleSound();
+      this.channel?.onKey(e);
+      return;
+    }
     if (this.state === 'story') {
       this.skipStory();
       return;
@@ -749,6 +786,8 @@ class Game {
         this.updateSan(rawDt);
       }
       if (this.state === 'playing' || this.state === 'demo') this.updatePlay(dt, t);
+    } else if (this.state === 'internal') {
+      this.channel.update(dt, t);
     } else if (this.state === 'paused') {
       // 冻结
     } else if (this.state === 'caught') {

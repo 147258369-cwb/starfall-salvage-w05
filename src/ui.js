@@ -56,6 +56,7 @@ export class UI {
     click('btn-start', () => this.emit('start'));
     click('btn-demo', () => this.emit('demo'));
     click('btn-help', () => this.emit('help'));
+    click('btn-internal', () => this.emit('internal'));
     click('btn-help-close', () => this.emit('helpClose'));
     click('btn-enter', () => this.emit('enter'));
     click('btn-resume', () => this.emit('resume'));

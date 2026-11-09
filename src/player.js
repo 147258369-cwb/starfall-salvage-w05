@@ -1,9 +1,10 @@
 // 玩家：第一/第三人称、移动碰撞、体力、手电、脚步
 import * as THREE from 'three';
-import { PLAYER, SPAWN_CELL, SPAWN_YAW, cellCenter } from './config.js';
+import { PLAYER, SPAWN_CELL, SPAWN_YAW, cellCenter, GRID } from './config.js';
 
 const damp = (a, b, lambda, dt) => b + (a - b) * Math.exp(-lambda * dt);
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+const C = GRID.cell; // 格子尺寸，飞行时用来限制活动范围
 
 export class Player {
   constructor(camera, world, audio) {
@@ -34,6 +35,8 @@ export class Player {
     this.fovTarget = 70;
     this.demoSpeedFactor = 1;
     this.flashOn = true;
+    this.fly = false;        // 内部通道：自由飞行（无碰撞、无重力）
+    this.flySpeed = 6.5;
     this.onFootstep = null;
     this.onJump = null;
     this._skipMoves = 0; // 指针锁重置后要跳过的 mousemove 数
@@ -58,6 +61,7 @@ export class Player {
     this.walkPhase = 0;
     this.stepDist = 0;
     this.frozen = false;
+    this.fly = false;
     this.shake = 0;
     this.vy = 0;
     this.jumpY = 0;
@@ -153,12 +157,14 @@ export class Player {
         if (k.startsWith('arrow')) e.preventDefault();
       }
       if (k === 'shift') this.keys.add('shift');
-      if (k === ' ') { this.jump(); e.preventDefault(); }
+      if (k === 'control' || k === 'c' || k === 'q' || k === 'e') this.keys.add(k);
+      if (k === ' ') { this.keys.add(' '); this.jump(); e.preventDefault(); }
     });
     window.addEventListener('keyup', (e) => {
       const k = e.key.toLowerCase();
       this.keys.delete(k);
       if (k === 'shift') this.keys.delete('shift');
+      if (k === ' ') this.keys.delete(' ');
     });
     window.addEventListener('blur', () => this.keys.clear());
     document.addEventListener('mousemove', (e) => {
@@ -197,9 +203,42 @@ export class Player {
 
   addShake(amount) { this.shake = Math.min(1.2, this.shake + amount); }
 
+  // 内部通道：自由飞行。无碰撞、无重力、无体力，方便从任意角度检查场景。
+  flyUpdate(dt) {
+    const has = (n) => this.keys.has(n);
+    const f = (has('w') || has('arrowup') ? 1 : 0) - (has('s') || has('arrowdown') ? 1 : 0);
+    const r = (has('d') || has('arrowright') ? 1 : 0) - (has('a') || has('arrowleft') ? 1 : 0);
+    const up = (has(' ') || has('q')) ? 1 : 0;
+    const down = (has('control') || has('c') || has('e')) ? 1 : 0;
+    const boost = has('shift') ? 2.6 : 1;
+    const cosP = Math.cos(this.pitch);
+    const fwd = new THREE.Vector3(-Math.sin(this.yaw) * cosP, Math.sin(this.pitch), -Math.cos(this.yaw) * cosP);
+    const right = new THREE.Vector3(Math.cos(this.yaw), 0, -Math.sin(this.yaw));
+    const wish = new THREE.Vector3();
+    if (this.lookEnabled || this.bot) {
+      wish.addScaledVector(fwd, f).addScaledVector(right, r);
+      wish.y += up - down;
+    }
+    if (wish.lengthSq() > 1e-4) wish.normalize();
+    const speed = (this.flySpeed || 6.5) * boost;
+    this.velocity.x = damp(this.velocity.x, wish.x * speed, 12, dt);
+    this.velocity.y = damp(this.velocity.y, wish.y * speed, 12, dt);
+    this.velocity.z = damp(this.velocity.z, wish.z * speed, 12, dt);
+    this.position.x = clamp(this.position.x + this.velocity.x * dt, -C * 4, 27 * C + C * 4);
+    this.position.z = clamp(this.position.z + this.velocity.z * dt, -C * 4, 21 * C + C * 4);
+    this.position.y = clamp(this.position.y + this.velocity.y * dt, 0.15, 14);
+    this.moving = wish.lengthSq() > 1e-4;
+    this.sprinting = boost > 1 && this.moving;
+    this.walkPhase += dt * (this.moving ? 4 : 1);
+    this.camera.fov = damp(this.camera.fov, 70, 6, dt);
+    this.camera.updateProjectionMatrix();
+    this.updateCamera(dt, 0);
+    this.model.position.set(this.position.x, 0, this.position.z);
+  }
+
   // 跳跃：竖直起跳，落地自动复位
   jump() {
-    if (!this.onGround || this.frozen || this.bot) return;
+    if (this.fly || !this.onGround || this.frozen || this.bot) return;
     this.vy = 5.0;
     this.onGround = false;
     this.onJump?.();
@@ -210,6 +249,7 @@ export class Player {
   }
 
   update(dt, time) {
+    if (this.fly) { this.flyUpdate(dt); return; }
     const bot = this.bot;
     if (bot) {
       this.input.forward = bot.forward ?? 1;
@@ -306,7 +346,11 @@ export class Player {
     const shakeX = (Math.sin(st * 37.7) * 0.62 + Math.sin(st * 23.3) * 0.38) * this.shake * 0.05;
     const shakeY = (Math.sin(st * 41.1 + 1.3) * 0.62 + Math.sin(st * 29.7 + 2.1) * 0.38) * this.shake * 0.045;
     const shakeRot = (Math.sin(st * 34.3 + 0.7) * 0.6 + Math.sin(st * 21.7 + 2.4) * 0.4) * this.shake * 0.012;
-    const head = new THREE.Vector3(this.position.x, PLAYER.eyeHeight + this.jumpY + bobY, this.position.z);
+    const head = new THREE.Vector3(
+      this.position.x,
+      this.fly ? this.position.y : PLAYER.eyeHeight + this.jumpY + bobY,
+      this.position.z,
+    );
 
     if (this.firstPerson) {
       this.camera.position.set(head.x + bobX + shakeX, head.y + shakeY, head.z);

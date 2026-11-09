@@ -658,3 +658,139 @@ kbd {
   .menu-audio { margin-top: 18px; }
   .loading-tip { margin-top: 30px; }
 }
+
+
+/* ============================== 内部通道（无怪物体检模式） ============================== */
+.menu-internal {
+  position: absolute;
+  right: 22px;
+  bottom: 46px;
+  z-index: 5;
+  padding: 6px 12px;
+  border: 1px solid rgba(169, 214, 196, .26);
+  border-radius: 3px;
+  background: rgba(6, 10, 10, .55);
+  color: rgba(169, 214, 196, .72);
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: .12em;
+  transition: color .2s var(--ease), border-color .2s var(--ease), background .2s var(--ease);
+}
+.menu-internal:hover {
+  color: #d9fff0;
+  border-color: rgba(169, 214, 196, .6);
+  background: rgba(10, 26, 22, .8);
+}
+
+#inspect {
+  position: fixed;
+  top: 16px;
+  left: 16px;
+  z-index: 30;
+  width: 348px;
+  max-height: calc(100vh - 32px);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px 12px 10px;
+  border: 1px solid rgba(169, 214, 196, .24);
+  border-radius: 4px;
+  background: rgba(6, 9, 10, .84);
+  box-shadow: 0 18px 48px rgba(0, 0, 0, .55);
+  backdrop-filter: blur(3px);
+  color: #dfeee6;
+  font-family: var(--mono);
+  font-size: 11px;
+  line-height: 1.5;
+  user-select: text;
+}
+.inspect-head { display: flex; align-items: baseline; gap: 8px; }
+.inspect-head b {
+  font: 600 13px/1 var(--sans);
+  letter-spacing: .08em;
+  color: #b8ffe0;
+}
+.inspect-head span { flex: 1; color: rgba(169, 214, 196, .55); font-size: 9px; letter-spacing: .14em; }
+.inspect-x {
+  padding: 2px 8px;
+  border: 1px solid rgba(255, 120, 120, .4);
+  border-radius: 3px;
+  color: #ff9e9e;
+  font-size: 10px;
+}
+.inspect-x:hover { background: rgba(255, 90, 90, .16); }
+.inspect-stats {
+  margin: 0;
+  padding: 7px 8px;
+  border-left: 2px solid rgba(169, 214, 196, .45);
+  background: rgba(255, 255, 255, .03);
+  color: #c8e6d8;
+  white-space: pre-wrap;
+  font-size: 10.5px;
+}
+.inspect-keys { display: flex; flex-wrap: wrap; gap: 4px 8px; color: rgba(223, 238, 230, .62); font-size: 10px; }
+.inspect-keys kbd {
+  padding: 0 4px;
+  border: 1px solid rgba(223, 238, 230, .28);
+  border-radius: 2px;
+  font-family: var(--mono);
+  font-size: 9.5px;
+  color: #eef7f1;
+}
+.inspect-list {
+  flex: 1;
+  min-height: 90px;
+  margin: 0;
+  padding: 0 2px 0 0;
+  overflow-y: auto;
+  list-style: none;
+  scrollbar-width: thin;
+}
+.inspect-list .issue {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  padding: 4px 6px;
+  border-bottom: 1px solid rgba(255, 255, 255, .06);
+  border-left: 2px solid transparent;
+  cursor: pointer;
+}
+.inspect-list .issue:hover { background: rgba(255, 255, 255, .07); }
+.inspect-list .issue b { font-weight: 600; font-size: 10.5px; color: #f0f6f2; }
+.inspect-list .issue span { color: rgba(223, 238, 230, .72); font-size: 10px; }
+.inspect-list .issue em { color: rgba(169, 214, 196, .45); font-size: 9.5px; font-style: normal; }
+.inspect-list .issue.error { border-left-color: #ff5a5a; }
+.inspect-list .issue.warn { border-left-color: #ffb347; }
+.inspect-list .issue.info { border-left-color: #7f8f88; }
+.inspect-list .issue.t-wall b { color: #ffb98a; }
+.inspect-list .issue.t-float b { color: #ff9a9a; }
+.inspect-list .issue.t-overlap b { color: #9ad8ff; }
+.inspect-list .empty { color: rgba(223, 238, 230, .5); cursor: default; }
+.inspect-footer { display: flex; flex-direction: column; gap: 6px; border-top: 1px solid rgba(255, 255, 255, .08); padding-top: 7px; }
+.inspect-foot { margin: 0; color: rgba(223, 238, 230, .66); white-space: pre-wrap; font-size: 10px; }
+.inspect-act { display: flex; gap: 6px; }
+.inspect-act button {
+  flex: 1;
+  padding: 3px 0;
+  border: 1px solid rgba(169, 214, 196, .24);
+  border-radius: 3px;
+  color: rgba(223, 238, 230, .8);
+  font-family: var(--mono);
+  font-size: 10px;
+}
+.inspect-act button:hover { background: rgba(169, 214, 196, .14); color: #eafff5; }
+.inspect-hint {
+  position: fixed;
+  left: 50%;
+  bottom: 28px;
+  transform: translateX(-50%);
+  z-index: 29;
+  padding: 6px 14px;
+  border: 1px solid rgba(169, 214, 196, .22);
+  border-radius: 999px;
+  background: rgba(6, 9, 10, .7);
+  color: rgba(223, 238, 230, .78);
+  font-family: var(--mono);
+  font-size: 11px;
+  pointer-events: none;
+}

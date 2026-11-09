@@ -108,6 +108,7 @@
     <span>WASD 移动 · 鼠标 视角 · 空格 跳跃 · SHIFT 加速 · E 互动 · V 视角 · M 静音 · ESC 暂停</span>
     <span class="menu-build">v1.0 · 单关试玩 · 大湾区大学 W05</span>
   </footer>
+  <button id="btn-internal" class="menu-internal" type="button" title="无怪物体检模式（场景排查用）">内部通道 · INTERNAL</button>
 </div>
 
 <!-- ========== 剧情 ========== -->
@@ -229,6 +230,40 @@
     <div class="loading-tip">提示：如果听到歌声，请不要回头。</div>
   </div>
 </div>
+
+<!-- ========== 内部通道：无怪物体检模式 ========== -->
+<div id="inspect" class="inspect hidden">
+  <header class="inspect-head">
+    <b>内部通道</b>
+    <span>INTERNAL · NO MONSTERS</span>
+    <button type="button" class="inspect-x" data-act="exit">退出</button>
+  </header>
+  <pre id="inspect-stats" class="inspect-stats"></pre>
+  <div class="inspect-keys">
+    <span><kbd>WASD</kbd>飞行</span>
+    <span><kbd>空格</kbd><kbd>C</kbd>升降</span>
+    <span><kbd>SHIFT</kbd>加速</span>
+    <span><kbd>滚轮</kbd>调速</span>
+    <span><kbd>1-6</kbd>跳房间</span>
+    <span><kbd>R</kbd>重扫</span>
+    <span><kbd>B</kbd>标记</span>
+    <span><kbd>N</kbd>透墙</span>
+    <span><kbd>G</kbd>格网</span>
+    <span><kbd>L</kbd>灯光</span>
+    <span><kbd>H</kbd>面板</span>
+    <span><kbd>ESC</kbd>退出</span>
+  </div>
+  <ul id="inspect-list" class="inspect-list"></ul>
+  <footer class="inspect-footer">
+    <pre id="inspect-foot" class="inspect-foot"></pre>
+    <div class="inspect-act">
+      <button type="button" data-act="scan">重扫 R</button>
+      <button type="button" data-act="walls">透墙 N</button>
+      <button type="button" data-act="info">显示吊挂 I</button>
+    </div>
+  </footer>
+</div>
+<div id="inspect-hint" class="inspect-hint hidden">点击画面锁定鼠标 · 再按 ESC 退出通道</div>
 
 <div id="hallucination" class="hallucination hidden" aria-hidden="true"><img id="hallucination-img" alt="" /><img alt="" /><img alt="" /><img alt="" /><img alt="" /><img alt="" /></div>
 <div id="jumpscare" class="jumpscare hidden" aria-hidden="true"><img id="jumpscare-img" alt="" /></div>
