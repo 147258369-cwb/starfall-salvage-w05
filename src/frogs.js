@@ -256,6 +256,7 @@ class Frog {
     this.dazedT = 0;
     this.stillT = 0;
     this.farT = 0;
+    this.strafeSide = index % 2 === 0 ? 1 : -1;  // 贴脸时往哪边侧身，固定住避免左右抖
     this.voiceT = 0;
     this.gain = 0;
     this.yawNoise = Math.random() * Math.PI * 2;
@@ -345,9 +346,21 @@ class Frog {
       direction.set(this.player.position.x - this.pos.x, 0, this.player.position.z - this.pos.z);
       if (direction.lengthSq() > 0.0001) direction.normalize();
     } else if (dist < keepDist - 0.6) {
-      // 贴得太近：后退一点，保持“追不上”的压迫感
-      direction.set(this.pos.x - this.player.position.x, 0, this.pos.z - this.player.position.z);
-      if (direction.lengthSq() > 0.0001) direction.normalize();
+      // 玩家主动贴上来时【不再后退】。
+      // 旧做法是沿"远离玩家"方向倒着走，看起来像怪物怕你；现在改成站住盯人，
+      // 只有真的贴到身上才侧身挪半步 —— 既不显得怕，也不会和玩家模型叠在一起。
+      const nx = this.pos.x - this.player.position.x;
+      const nz = this.pos.z - this.player.position.z;
+      const l = Math.hypot(nx, nz) || 1;
+      direction.set((-nz / l) * this.strafeSide, 0, (nx / l) * this.strafeSide);
+      if (this.world.pointBlocked(
+        this.pos.x + direction.x * 1.3,
+        this.pos.z + direction.z * 1.3,
+        this.variant.radius,
+      )) {
+        this.strafeSide = -this.strafeSide;
+        direction.multiplyScalar(-1);
+      }
     }
 
     // 与同伴分离
@@ -368,14 +381,14 @@ class Frog {
     if (keeping) {
       if (dist > keepDist + 2.2) speed = this.variant.speed;
       else if (dist > keepDist + 0.7) speed = this.variant.speed * 0.45;
-      else if (dist < keepDist - 0.6) speed = 2.2;
-      else speed = 0;
+      else if (dist < 2.4) speed = 2.6;   // 只剩侧移，方向已换成垂直于逼近线
+      else speed = 0;                     // 5.0~2.4m：站住盯人，不前进也不后退
     } else {
       speed = 2.8 + Math.min(1.2, this.stillT);
       // 倒下时向玩家方向微调
     }
-    // 被抓前兆：非常近时放慢，避免巡逻时误触
-    if (dist < 2.2 && playerSpeed > 1.2) speed *= 0.35;
+    // 被抓前兆：非常近时放慢，避免巡逻时误触（侧身让位那条分支不减速，否则躲不开）
+    if (dist < 2.2 && playerSpeed > 1.2 && !(keeping && dist < 2.4)) speed *= 0.35;
     this.vel.x = damp(this.vel.x, direction.x * speed, 6, dt);
     this.vel.z = damp(this.vel.z, direction.z * speed, 6, dt);
 

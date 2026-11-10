@@ -5,10 +5,13 @@ import { GRID, CANDY_CELLS, EXIT, TOTAL_CANDIES } from './config.js';
 
 const C = GRID.cell;
 
-// 奶蛙在玩家移动时会保持 ~5.6m，所以"危险"必须明显小于这个值，
-// 否则机器人会一直以为被追、永远在逃、一片奶片都捡不到（第一版就是这么翻车的）。
-const FLEE_RADIUS = 3.6;
-// 已经在逼近（奶蛙停下后会追到 0.85m）时提前冲刺
+// 奶蛙跟着你走时保持 ~5.6m；你停住 1.4 秒它才会真的扑上来。
+// 所以"危险"不能只看距离：只看距离的话，一只站在原地的奶蛙会把机器人
+// 永远逼在原地绕圈（实测把通关率打到 0）。这里改成"离得极近"或"它正在逼近"。
+const FLEE_RADIUS = 2.0;
+const CLOSING_RADIUS = 3.6;
+const CLOSING_RATE = 1.2;   // m/s，间距缩小得比这快才算"它在扑我"
+// 已经在逼近时提前冲刺
 const PRESS_RADIUS = 5.4;
 // 只有最近的奶蛙比这个远，才允许停下来（回头展示/到达终点）
 const SAFE_IDLE = 10.5;
@@ -102,6 +105,7 @@ export class Demo {
     this.milkTarget = null;
     this.fleeing = false;
     this.avoidSide = 0;
+    this.frogDist = new Map();   // 每只奶蛙上一帧的间距，用来算"是否在缩小"
   }
 
   start() {
@@ -341,9 +345,20 @@ export class Demo {
     }
 
     const nearest = this.nearestFrog();
+    // "它在逼近"必须用【间距在缩小】来判断。
+    // 只看奶蛙速度方向是错的：我逃跑时它永远朝我追，速度方向永远指着我，
+    // 于是每帧都被判成"逼近"，机器人就一直在逃（实测通关率直接归零）。
+    let closing = false;
+    if (nearest.frog) {
+      const prev = this.frogDist.get(nearest.frog.index);
+      this.frogDist.set(nearest.frog.index, nearest.dist);
+      if (prev != null) closing = (prev - nearest.dist) / Math.max(dt, 1e-4) > CLOSING_RATE;
+    } else {
+      this.frogDist.clear();
+    }
 
-    // 1) 保命优先：奶蛙贴上来就跑，跑的同时也不停
-    if (nearest.dist < FLEE_RADIUS) {
+    // 1) 保命优先：已经贴脸，或者它正在扑过来，才逃
+    if (nearest.dist < FLEE_RADIUS || (closing && nearest.dist < CLOSING_RADIUS)) {
       this.flee(nearest, dt);
       this.trackStuck(dt);
       return;
