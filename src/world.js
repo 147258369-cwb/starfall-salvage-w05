@@ -878,14 +878,19 @@ export class World {
   buildDragonMilk() {
     this.dragonMilk = [];
     this.dragonMilkUnlocked = false;
+    // 龙奶要在暗场里一眼看见：玻璃带一点自发光，奶液提亮，瓶身外加雾气与地面光斑。
     const glass = new THREE.MeshStandardMaterial({
-      color: 0xd9f6f1, roughness: 0.16, metalness: 0.1,
-      transparent: true, opacity: 0.34, depthWrite: false,
+      color: 0xdff6ef, roughness: 0.16, metalness: 0.05,
+      transparent: true, opacity: 0.44, depthWrite: false,
+      emissive: 0x6fbfae, emissiveIntensity: 0.55,
     });
     const milk = new THREE.MeshStandardMaterial({
-      color: 0xfffdf1, roughness: 0.48, emissive: 0xc5d4bb, emissiveIntensity: 0.35,
+      color: 0xfffdf1, roughness: 0.5, emissive: 0xfff1c6, emissiveIntensity: 1.0,
     });
-    const cap = new THREE.MeshStandardMaterial({ color: 0xa6c6a3, roughness: 0.52, metalness: 0.2 });
+    const cap = new THREE.MeshStandardMaterial({
+      color: 0x9fd6a8, roughness: 0.5, metalness: 0.15,
+      emissive: 0x3f6f4a, emissiveIntensity: 0.7,
+    });
     const bodyGeo = new THREE.CylinderGeometry(0.16, 0.18, 0.48, 16, 1, true);
     const milkGeo = new THREE.CylinderGeometry(0.135, 0.15, 0.32, 16);
     const shoulderGeo = new THREE.CylinderGeometry(0.075, 0.16, 0.12, 16, 1, true);
@@ -893,14 +898,40 @@ export class World {
     const capGeo = new THREE.CylinderGeometry(0.085, 0.085, 0.065, 16);
     for (let i = 0; i < DRAGON_MILK.count; i++) {
       const group = new THREE.Group();
-      const body = new THREE.Mesh(bodyGeo, glass); body.position.y = 0.25; group.add(body);
-      const liquid = new THREE.Mesh(milkGeo, milk); liquid.position.y = 0.19; group.add(liquid);
-      const shoulder = new THREE.Mesh(shoulderGeo, glass); shoulder.position.y = 0.55; group.add(shoulder);
-      const neck = new THREE.Mesh(neckGeo, glass); neck.position.y = 0.66; group.add(neck);
-      const lid = new THREE.Mesh(capGeo, cap); lid.position.y = 0.735; group.add(lid);
+      // 瓶子本体单独一层并放大，方便远处辨认；外层 group 仍按世界尺度放光效。
+      const bottle = new THREE.Group();
+      bottle.scale.setScalar(1.35);
+      const body = new THREE.Mesh(bodyGeo, glass); body.position.y = 0.25; bottle.add(body);
+      const liquid = new THREE.Mesh(milkGeo, milk); liquid.position.y = 0.19; bottle.add(liquid);
+      const shoulder = new THREE.Mesh(shoulderGeo, glass); shoulder.position.y = 0.55; bottle.add(shoulder);
+      const neck = new THREE.Mesh(neckGeo, glass); neck.position.y = 0.66; bottle.add(neck);
+      const lid = new THREE.Mesh(capGeo, cap); lid.position.y = 0.735; bottle.add(lid);
+      group.add(bottle);
+
+      // 瓶口上方的暖白光团：暗场里靠它先被看见，再看清瓶子
+      const glow = new THREE.Sprite(new THREE.SpriteMaterial({
+        map: this.tex.glow(), color: 0xfff2cf, transparent: true, opacity: 0.85,
+        blending: THREE.AdditiveBlending, depthWrite: false, fog: true,
+      }));
+      glow.position.y = 0.62;
+      glow.scale.set(1.75, 1.75, 1);
+      group.add(glow);
+
+      // 脚下的一圈地面光斑，标出可拾取位置
+      const ring = new THREE.Mesh(new THREE.PlaneGeometry(1.3, 1.3), new THREE.MeshBasicMaterial({
+        map: this.tex.glow(), color: 0x8fe8c6, transparent: true, opacity: 0.3,
+        blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide, fog: true,
+      }));
+      ring.rotation.x = -Math.PI / 2;
+      ring.position.y = -0.03;
+      group.add(ring);
+
       group.visible = false;
       this.group.add(group);
-      this.dragonMilk.push({ index: i, group, collected: false, available: false, phase: i * 2.1 });
+      this.dragonMilk.push({
+        index: i, group, bottle, glow, ring,
+        collected: false, available: false, phase: i * 2.1,
+      });
     }
     this.resetDragonMilk();
   }
@@ -1106,6 +1137,14 @@ export class World {
       if (!item.group.visible) continue;
       item.group.position.y = 0.04 + 0.025 * Math.sin(t * 1.6 + item.phase);
       item.group.rotation.y += dt * 0.35;
+      // 呼吸式明暗：静止时也有一点变化，避免被当成地面杂物
+      const pulse = 0.5 + 0.5 * Math.sin(t * 1.9 + item.phase);
+      if (item.glow) {
+        item.glow.material.opacity = 0.55 + 0.26 * pulse;
+        const s = 1.66 + 0.18 * pulse;
+        item.glow.scale.set(s, s, 1);
+      }
+      if (item.ring) item.ring.material.opacity = 0.22 + 0.16 * pulse;
     }
     for (let i = 0; i < this.cakeFlames.length; i++) {
       const fl = this.cakeFlames[i];
