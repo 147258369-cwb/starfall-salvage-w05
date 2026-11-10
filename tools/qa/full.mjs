@@ -570,7 +570,7 @@ async function main() {
       g.updatePlay(0.05, i * 0.05);
       if (i % 100 === 0) {
         log.push({
-          t: +(i * 0.05).toFixed(1), candies: g.candiesCollected, route: g.demo.routeIndex,
+          t: +(i * 0.05).toFixed(1), candies: g.candiesCollected, route: g.demo.tourPos,
           x: +g.player.position.x.toFixed(1), z: +g.player.position.z.toFixed(1),
           sprint: g.player.sprinting, stamina: +g.player.stamina.toFixed(0),
           dazed: g.frogs.frogs.filter((f) => f.state === 'dazed').length,
@@ -580,7 +580,7 @@ async function main() {
     }
     return {
       steps: i, simTime: +(i * 0.05).toFixed(1), state: g.state, candies: g.candiesCollected,
-      route: g.demo.routeIndex, reachedExit: g.demo.reachedExit,
+      route: g.demo.tourPos, reachedExit: g.demo.reachedExit,
       mapUnlocked: g.mapUnlocked, speedUnlocked: g.speedUnlocked, log,
     };
   });

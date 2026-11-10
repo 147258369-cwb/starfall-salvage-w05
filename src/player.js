@@ -33,7 +33,6 @@ export class Player {
     this.shake = 0;
     this.shakeT = 0;
     this.fovTarget = 70;
-    this.demoSpeedFactor = 1;
     this.flashOn = true;
     this.fly = false;        // 内部通道：自由飞行（无碰撞、无重力）
     this.flySpeed = 6.5;
@@ -283,7 +282,7 @@ export class Player {
     }
     const wantMove = wish.lengthSq() > 0.001;
     const canSprint = this.speedUnlocked && this.input.sprint && this.stamina > 1 && wantMove && !frozen;
-    const targetSpeed = (canSprint ? PLAYER.sprintSpeed : PLAYER.walkSpeed) * (this.bot ? this.demoSpeedFactor : 1);
+    const targetSpeed = canSprint ? PLAYER.sprintSpeed : PLAYER.walkSpeed;
     this.sprinting = canSprint;
     this.moving = wantMove && !frozen;
 

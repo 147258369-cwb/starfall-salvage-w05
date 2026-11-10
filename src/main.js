@@ -173,13 +173,8 @@ class Game {
       }
     };
     this.story = new Story(this.camera, this.world, this.audio, this.ui);
-    this.demoGame = {
-      collected: this.collected,
-      candiesCollected: 0,
-      speedUnlocked: false,
-      demoReachExit: () => this.demoReachExit(),
-    };
-    this.demo = new Demo(this.demoGame, this.world, this.player, this.frogs);
+    // 演示机器人直接读真实游戏状态（SAN、龙奶、奶片、解锁），不再有影子副本
+    this.demo = new Demo(this, this.world, this.player, this.frogs);
     this.ui.setLoading(0.55, '正在叫醒奶蛙……');
     try {
       await this.audio.init((p) => this.ui.setLoading(0.55 + p * 0.4, '正在载入声音……'));
@@ -240,14 +235,12 @@ class Game {
     this.stopHallucination();
     this.world.resetDragonMilk();
     this.ui.setSan(this.san, false, 0);
-    this.grace = demo ? 99 : 2.5;
+    this.grace = 2.5;   // 演示与真人一样有开局保护，之后靠躲
     this.scares = 0;
     this.scareCooldown = 0;
     this.lowStaminaShown = false;
     this.frogAlertShown = false;
     this.reachedExitPrompt = false;
-    this.demoGame.candiesCollected = 0;
-    this.demoGame.speedUnlocked = false;
     this.player.reset();
     this.player.speedUnlocked = false;
     this.player.frozen = false;
@@ -255,9 +248,8 @@ class Game {
     this.player.flashOn = true;
     this.player.flashlight.visible = true;
     this.player.bot = null;
-    this.player.demoSpeedFactor = demo ? 1.42 : 1;
     this.player.lookEnabled = false;
-    this.frogs.reset({ demo });
+    this.frogs.reset();
     for (const c of this.world.candies) {
       c.collected = false;
       c.group.visible = true;
@@ -334,6 +326,7 @@ class Game {
   async startDemo() {
     if (this.state !== 'menu' || this._starting) return;
     this._starting = true;
+    this.demoDeaths = 0;
     this.pendingMenuMusic = false;
     await this.audio.resume();
     this.audio.playSfx('sfx_click', { gain: 0.6 });
@@ -374,7 +367,7 @@ class Game {
     } else {
       this.requestLock();
       this.grace = 2.5;
-      this.ui.toast({ kicker: '第 1 夜 · 22:07', title: '找到八片奶片', sub: 'WASD 移动 · 鼠标环视 · ESC 暂停 · M 静音', duration: 5.2 });
+      this.ui.toast({ kicker: '第 1 夜 · 22:07', title: `找到 ${TOTAL_CANDIES} 片奶片`, sub: 'WASD 移动 · 鼠标环视 · ESC 暂停 · M 静音', duration: 5.2 });
     }
   }
 
@@ -520,7 +513,6 @@ class Game {
     c.group.visible = false;
     this.collected[c.index] = true;
     this.candiesCollected++;
-    this.demoGame.candiesCollected = this.candiesCollected;
     this.ui.setCandies(this.candiesCollected);
     this.ui.pickupPulse();
     this.audio.playSfx('sfx_pickup', { gain: 0.8, pan: (Math.random() - 0.5) * 0.6 });
@@ -540,7 +532,6 @@ class Game {
   }
   unlockSpeed() {
     this.speedUnlocked = true;
-    this.demoGame.speedUnlocked = true;
     this.player.speedUnlocked = true;
     this.ui.unlockSpeed();
     this.ui.toast({ kicker: '获得道具 · ITEM', title: '加速 · 糖分', sub: '按住 SHIFT 冲刺 · 可以把它们甩开', duration: 5.2 });
@@ -644,7 +635,8 @@ class Game {
   }
 
   onCaught(frog, reason = 'caught') {
-    if (this.state !== 'playing' || (reason !== 'san' && this.grace > 0)) return;
+    // 演示模式同样会被抓：状态机、镜头、音效全部走同一条路径
+    if ((this.state !== 'playing' && this.state !== 'demo') || (reason !== 'san' && this.grace > 0)) return;
     this.stopHallucination();
     this.state = 'caught';
     this.player.frozen = true;
@@ -669,6 +661,18 @@ class Game {
       this.state = 'lose';
       this.jumpscareEl?.classList.add('hidden');
       this.ui.showLose(reason);
+      if (this.mode === 'demo') {
+        // 演示模式被抓 = 真失败：走同一套被抓演出，然后回菜单（最多自动重开 3 次）
+        this.demoDeaths = (this.demoDeaths || 0) + 1;
+        clearTimeout(this.demoReturnTimer);
+        this.demoReturnTimer = setTimeout(() => {
+          if (this.state !== 'lose') return;
+          this.goMenu();
+          if (this.demoDeaths < 3) {
+            setTimeout(() => { if (this.state === 'menu') this.startDemo(); }, 900);
+          }
+        }, 4200);
+      }
       this.audio.stopMusic(0.4);
     this.audio.stopVoice();
     this.audio.setHeartbeat(0);
@@ -782,7 +786,10 @@ class Game {
       this.player.updateCamera(0, t);
     } else if (this.state === 'playing' || this.state === 'demo') {
       this.applyAtmosphere('play');
+      // 演示模式也照常掉意识值：不给 demo 单独开后门
       if (this.state === 'playing' && !document.hidden && document.hasFocus()) {
+        this.updateSan(rawDt);
+      } else if (this.state === 'demo') {
         this.updateSan(rawDt);
       }
       if (this.state === 'playing' || this.state === 'demo') this.updatePlay(dt, t);

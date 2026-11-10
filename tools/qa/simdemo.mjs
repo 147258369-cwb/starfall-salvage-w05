@@ -25,7 +25,7 @@ const result = await page.evaluate(() => {
       log.push({
         t: +(i * 0.05).toFixed(1),
         candies: g.candiesCollected,
-        route: g.demo.routeIndex,
+        route: g.demo.tourPos,
         x: +g.player.position.x.toFixed(1),
         z: +g.player.position.z.toFixed(1),
         sprint: g.player.sprinting,
@@ -36,7 +36,7 @@ const result = await page.evaluate(() => {
       });
     }
   }
-  return { steps: i, simTime: +(i * 0.05).toFixed(1), state: g.state, candies: g.candiesCollected, route: g.demo.routeIndex, reachedExit: g.demo.reachedExit, log };
+  return { steps: i, simTime: +(i * 0.05).toFixed(1), state: g.state, candies: g.candiesCollected, route: g.demo.tourPos, reachedExit: g.demo.reachedExit, log };
 });
 console.log(JSON.stringify(result, null, 2));
 await browser.close();

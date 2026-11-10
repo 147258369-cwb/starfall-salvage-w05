@@ -6,7 +6,9 @@ try {
   await api.waitFor("window.__mfp && window.__mfp.state === 'internal'", { timeout: 150000 });
   const res = await api.evaluate(() => {
     const g = window.__mfp, w = g.world;
-    const route = g.demo.buildRoute();
+    // Demo 现在用 2-opt 巡回（tour），从真实出生点规划一次
+    g.demo.planTour();
+    const route = g.demo.tour.slice();
     const routeSet = new Set(route);
     return {
       candiesInWorld: w.candies.length,

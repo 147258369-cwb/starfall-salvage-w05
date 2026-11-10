@@ -293,7 +293,6 @@ class Frog {
     const dist = this.distanceToPlayer;
     const playerSpeed = Math.hypot(this.player.velocity.x, this.player.velocity.z);
     const active = opts.active;
-    const demo = opts.demo;
     const dazed = this.state === 'dazed';
 
     if (!active) {
@@ -399,8 +398,8 @@ class Frog {
     this.gain = damp(this.gain, targetGain, 4, dt);
     this.applyVoice(this.gain, pan, true, dist);
 
-    // 抓到玩家
-    if (!demo && dist < 1.08 && playerSpeed < 1.0 && opts.grace <= 0) {
+    // 抓到玩家：演示模式与真人同一套判定，没有任何豁免
+    if (dist < 1.08 && playerSpeed < 1.0 && opts.grace <= 0) {
       opts.onCatch?.(this);
     }
   }
@@ -512,13 +511,12 @@ export class FrogManager {
     // Frog 构造时已把模型加入 world.group，这里不再重复挂载
   }
 
-  reset({ demo = false } = {}) {
+  reset() {
     this.active = false;
     this.grace = 3.2;
     this.nearLineCooldown = 2;
     this.nearest = 99;
     this.danger = 0;
-    this.demo = demo;
     this.frogs.forEach((f) => {
       f.spawn();
       f.state = 'idle';
@@ -552,7 +550,6 @@ export class FrogManager {
       f.update(dt, time, {
         active: this.active,
         frogs: this.frogs,
-        demo: opts.demo || this.demo,
         grace: this.grace + (opts.grace || 0),
         onCatch: (frog) => {
           if (this.onCatch) this.onCatch(frog);
