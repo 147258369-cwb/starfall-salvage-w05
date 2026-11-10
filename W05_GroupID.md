@@ -10,7 +10,7 @@ Game title and one-sentence goal:
 **《奶蛙乐园：午夜奶片》**（Milk Frog Park: Midnight Milk Candy）——在废弃的奶蛙乐园迷宫里收集八片奶片，躲开一直跟着你的奶蛙，从天亮前的安全出口离开。
 
 GitHub repository URL (only if used):
-https://github.com/147258369-cwb/starfall-salvage-w05.git
+https://github.com/147258369-cwb/milk-frog-park-w05.git
 
 Harness/model(s), why selected, and material AI help:
 - **Harness:** DeepSeek Harness（dsh）Web/CLI 编码代理，Team Lead + 子代理协作；**Model:** deepseek-v4-1-flash。

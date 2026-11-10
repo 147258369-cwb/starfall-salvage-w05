@@ -92,7 +92,7 @@
 
 > 交接时间：2026-10-29 21:xx（HKT）  
 > 最新功能提交：2d7e1d6（奶蛙外观重做）；交接文档提交见最新 git log  
-> 远程：https://github.com/147258369-cwb/starfall-salvage-w05.git  
+> 远程：https://github.com/147258369-cwb/milk-frog-park-w05.git  
 > 推送状态：**已 push 到 origin/main**（2026-10-29；git status -sb 显示 up-to-date）  
 > 接手人请先读本文件，再读 README.md；提交作业前必读 W05_GroupID.md。
 
@@ -148,7 +148,7 @@
 ## 2. 五分钟跑起来
 
 ~~~bat
-cd D:\3dgame\starfall-salvage-w05
+cd D:\3dgame\milk-frog-park-w05
 python serve.py 8000
 ~~~
 
@@ -294,7 +294,7 @@ python tools/package_submission.py
 - node_modules/、release/、tools/qa/out/、tools/shots/ 都被 .gitignore 忽略，不要强行提交。
 - 改动 src/textures.js 后要同时看 tools/texture-preview.html；贴图缓存共享 repeat，需要不同平铺时 clone。
 - 改动 assets/audio/manifest.json 后，音频键名必须和 src/audio.js / src/story.js 对应。
-- Git 远程：https://github.com/147258369-cwb/starfall-salvage-w05.git ；本次交接已 push main，后续以 git status -sb 是否显示 up-to-date 为准。
+- Git 远程：https://github.com/147258369-cwb/milk-frog-park-w05.git ；本次交接已 push main，后续以 git status -sb 是否显示 up-to-date 为准。
 
 ---
 
