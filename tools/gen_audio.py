@@ -3,7 +3,7 @@
 """
 《奶蛙乐园：午夜奶片》—— 原创音频生成器
 ====================================================
-一条命令重建全部音频：
+一条命令重建全部音频（frog_voice_1 从 tools/audio_sources/ 读取用户提供的录音）：
 
     python tools/gen_audio.py              # 全量生成 + 自检
     python tools/gen_audio.py --only music_menu,sfx_click
@@ -13,7 +13,7 @@
 （Microsoft Kangkang / Huihui / Yaoyao，OneCore）。TTS 走
 Windows.Media.SpeechSynthesis（WinRT），因为 System.Speech(SAPI5)
 在本机只暴露 Huihui Desktop，看不到 Kangkang / Yaoyao。
-外部不下载任何素材，全部由本脚本 + 本机语音合成。
+不下载素材；除 tools/audio_sources/ 中的用户提供录音外，音频由本脚本 + 本机语音合成。
 """
 from __future__ import annotations
 
@@ -406,7 +406,6 @@ VOICE_JOBS = [
     ("vo_03", "Kangkang", "所有孩子都吃了。只有你，把八片奶片藏了起来。", "1.20"),
     ("vo_04", "Kangkang", "第二天，乐园空了。只剩那首歌——我是奶龙，我才是奶龙。", "1.20"),
     ("vo_05", "Kangkang", "推土机明天就来。你回来取走奶片。", "1.20"),
-    ("frog_voice_1", "Huihui", "我是奶龙！我才是奶龙！", "1.0"),
     ("frog_voice_2", "Kangkang", "奶……奶片……给我……", "0.70"),
     ("frog_voice_3", "Yaoyao", "龙……奶龙……都是奶龙……", "1.05"),
     ("frog_voice_4", "Huihui", "嘘……别怕……留下来……", "0.85"),
@@ -741,20 +740,28 @@ def make_vo(key, resample_ratio=0.93):
 
 
 def make_frog_1():
-    x, sr = load_tts("frog_voice_1")
+    """用户提供的奶蛙追击录音：自然人声，不再用 OneCore TTS。
+
+    源文件在 tools/audio_sources/frog_voice_1_user.wav。为避免循环播放时音量突兀，
+    按旧 TTS 的 50ms 短时 RMS 第 95 百分位（约 0.174）匹配活跃片段响度；
+    保留源录音的动态与音色，不再加变调/饱和/混响；最后做 20ms loopify 接缝。
+    """
+    source = ROOT / "tools" / "audio_sources" / "frog_voice_1_user.wav"
+    if not source.exists():
+        raise SystemExit(f"用户提供的奶蛙录音不存在：{source}")
+    x, sr = read_wav_raw(source)
     x = to32k(x, sr)
-    x = trim_lead(x)
-    x = resample(x, 1.12)                    # 尖细一点，像塑料玩具
-    x = highpass(x, 240, SR, 2)
-    x = lowpass(x, 5600, SR, 2)
-    x = saturate(x, 1.25)
-    x = x + bandpass(x, 900, 2600) * 0.25    # 一点点共振
-    x = reverb(x, wet=0.16, room=0.9, decay=0.5, seed=13)
-    x = norm(x, PEAK_DB)
-    target = max(3.2, len(x) / SR + 0.55)
-    y = np.zeros(int(target * SR))
-    y[: len(x)] = x
-    return loopify(norm(fade(y, 0.01, 0.35)), 0.02)
+    block = max(1, int(0.05 * SR))
+    active = [float(np.sqrt(np.mean(x[i:i + block] ** 2)))
+              for i in range(0, len(x), block) if len(x[i:i + block])]
+    active_p95 = float(np.quantile(active, 0.95)) if active else 0.0
+    if active_p95 < 1e-9:
+        raise SystemExit("用户提供的奶蛙录音为空或近似静音")
+    x = x * (0.1742 / active_p95)           # 与旧 frog_voice_1 活跃段响度匹配，避免替换后突然变大
+    peak = float(np.max(np.abs(x))) if x.size else 0.0
+    if peak > 0.90:
+        x = x * (0.90 / peak)               # 防止峰值过载
+    return loopify(x, 0.02)
 
 
 def make_frog_2():
@@ -1140,7 +1147,7 @@ for _i in range(1, 6):
                       "第二天，乐园空了，只剩那首歌", "推土机明天就来，回来取奶片"][_i - 1],
           (lambda k=f"vo_0{_i}": make_vo(k)), text=None)
 
-track("frog_voice_1", "voice", True, 0.55, "奶蛙叫声 1（正常变调，尖细塑料玩具感）", make_frog_1, text="我是奶龙！我才是奶龙！")
+track("frog_voice_1", "voice", True, 0.55, "奶蛙追击人声（用户提供录音，按旧活跃段响度匹配）", make_frog_1, text="我是奶龙！我才是奶龙！")
 track("frog_voice_2", "voice", True, 0.55, "奶蛙叫声 2（慢速低吼，喉咙毛刺）", make_frog_2, text="奶……奶片……给我……")
 track("frog_voice_3", "voice", True, 0.52, "奶蛙叫声 3（卡带鬼畜：切碎重复、掉帧、比特粉碎、随机倒放）", make_frog_3, text="龙……奶龙……都是奶龙……")
 track("frog_voice_4", "voice", True, 0.50, "奶蛙叫声 4（耳语气声：滤掉低频，气声包络补足）", make_frog_4, text="嘘……别怕……留下来……")
@@ -1198,7 +1205,8 @@ def inspect(path: Path, is_loop: bool):
         seam_ok = d <= max(0.02, 20 * g)
         seam_db = 20 * math.log10(max(d, 1e-9))
     clip_ok = peak <= 0.90          # 留出 1.5dB 以上 headroom，绝不削波
-    peak_ok = -3.0 <= peak_db <= -0.5
+    # frog_voice_1 是用户提供的自然录音：以活跃段响度匹配旧 TTS，峰值允许低于统一生成峰值。
+    peak_ok = (-6.5 <= peak_db <= -0.5) if path.stem == "frog_voice_1" else (-3.0 <= peak_db <= -0.5)
     return dict(file=path.name, dur=dur, nch=nch, sr=sr, sw=sw,
                 peak_db=peak_db, rms_db=rms_db, seam_ok=seam_ok, seam_db=seam_db,
                 clip_ok=clip_ok, peak_ok=peak_ok)

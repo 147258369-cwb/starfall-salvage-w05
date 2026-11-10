@@ -84,8 +84,8 @@
       "kind": "voice",
       "loop": true,
       "gain": 0.55,
-      "duration": 3.87,
-      "desc": "奶蛙叫声 1（正常变调，尖细塑料玩具感）",
+      "duration": 4.0,
+      "desc": "奶蛙追击人声 1（用户提供自然录音；按旧 TTS 活跃段响度匹配，保留原声）",
       "text": "我是奶龙！我才是奶龙！"
     },
     "frog_voice_2": {
