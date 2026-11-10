@@ -532,10 +532,13 @@ export class World {
   }
 
   buildClassroom() {
-    // 黑板
-    this.addBox(4.4, 1.75, 0.08, MAT.board, 13.5 * C, 1.76, 1.04 * C);
-    this.addBox(4.5, 0.08, 0.16, MAT.woodDark, 13.5 * C, 0.9, 1.08 * C);
-    this.addBox(0.16, 0.03, 0.03, MAT.white, 44.2, 0.955, 1.08 * C); // 粉笔：躺在粉笔槽上（槽顶 0.94）
+    // 黑板要贴在教室北墙上（墙格 z=0，墙面在 z=3.2）。
+    // 原来写 1.04 * C = 3.328，整块黑板悬在墙外 0.13 m，看过去就是一块没着落的黑方块。
+    const wallZ = 1 * C;   // 墙格(12,0) 占 z 0..3.2，室内一侧墙面在 z = 3.2
+    this.addBox(4.4, 1.75, 0.08, MAT.board, 13.5 * C, 1.76, wallZ + 0.04);
+    // 粉笔槽挂在黑板下沿外侧（厚 0.16，从黑板面往外伸）
+    this.addBox(4.5, 0.08, 0.16, MAT.woodDark, 13.5 * C, 0.875, wallZ + 0.08 + 0.08);
+    this.addBox(0.16, 0.03, 0.03, MAT.white, 44.2, 0.93, wallZ + 0.08 + 0.07); // 粉笔：躺在粉笔槽里
     this.addPoster('drawing', 11.04 * C, 1.78, 4.6 * C, Math.PI / 2, 1.65, 2.2); // 原来挂在 3.2 格，正对教室西门(10,3)
     this.addPoster('rules', 13.2 * C, 1.72, 6.94 * C, Math.PI, 1.5, 2.1); // 原来和 11.6 格的奶蛙海报重叠 0.14 m
     // 讲台

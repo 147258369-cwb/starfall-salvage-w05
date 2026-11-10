@@ -1,8 +1,9 @@
 // 奶蛙乐园：午夜奶片 — 静态配置与地图布局
 export const GRID = { W: 27, H: 21, cell: 3.2, wallH: 3.45 };
-export const TOTAL_CANDIES = 8;
-export const UNLOCK_MAP_AT = 3;
-export const UNLOCK_SPEED_AT = 6;
+// 奶片总数：走廊密铺、房间点缀。解锁门槛按 1/3、2/3 取整。
+export const TOTAL_CANDIES = 24;
+export const UNLOCK_MAP_AT = 8;
+export const UNLOCK_SPEED_AT = 16;
 // 龙奶每局随机分布在不同房间；交互距离为水平世界坐标距离。
 export const DRAGON_MILK = { count: 3, interactionRadius: 1.6, minSeparation: 12 };
 export const PLAYER = {
@@ -41,15 +42,27 @@ export const DOORS = [
   [14, 10], [17, 15],        // 食堂
   [23, 10], [20, 15],        // 出口厅
 ];
+// 24 片：走廊为主（15 片），房间点缀（9 片）。
+// 顺序即 Demo 自动通关的默认路线的起点参考（Demo 会按最近邻重排）。
 export const CANDY_CELLS = [
-  [4, 4],   // 门厅
-  [13, 3],  // 教室
-  [23, 4],  // 园长室
-  [9, 13],  // 中央走廊
-  [14, 15], // 食堂
-  [3, 15],  // 午睡室
-  [23, 9],  // 主走廊东段
-  [23, 16], // 出口厅
+  // 门厅
+  [5, 3],
+  // 教室
+  [12, 2], [15, 5],
+  // 园长室
+  [25, 5],
+  // 午睡室
+  [3, 13], [4, 17],
+  // 食堂
+  [12, 12], [15, 17],
+  // 出口厅
+  [24, 15],
+  // 中央走廊 x8-9
+  [8, 2], [9, 6], [8, 10], [9, 13], [8, 16],
+  // 主走廊 z8-9
+  [3, 8], [6, 9], [11, 8], [16, 9], [21, 8], [25, 9],
+  // 右走廊 x18-19
+  [19, 3], [18, 7], [19, 12], [18, 16],
 ];
 export const FROG_DEFS = [
   { variant: 'small', cell: [14, 13], voice: 0 },

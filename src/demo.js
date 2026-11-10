@@ -1,5 +1,5 @@
 // Demo 模式：真实游戏内的脚本机器人，自动收集奶片、解锁、冲刺、离开
-import { GRID, CANDY_CELLS, EXIT } from './config.js';
+import { GRID, CANDY_CELLS, EXIT, SPAWN_CELL, TOTAL_CANDIES } from './config.js';
 
 const C = GRID.cell;
 
@@ -67,7 +67,7 @@ export class Demo {
     this.player = player;
     this.frogs = frogs;
     this.active = false;
-    this.route = [0, 5, 3, 4, 1, 2, 6, 7];
+    this.route = this.buildRoute();
     this.routeIndex = 0;
     this.path = [];
     this.pathIndex = 0;
@@ -81,6 +81,26 @@ export class Demo {
     this.sprintTimer = 0;
     this.elapsed = 0;
     this.nudgeT = 0;
+  }
+
+  // 奶片数量变了以后，手写的固定顺序会漏掉新奶片；改成从出生点按最近邻自动排路线。
+  buildRoute() {
+    const order = [];
+    const used = new Set();
+    let cur = SPAWN_CELL;
+    while (order.length < CANDY_CELLS.length) {
+      let best = -1, bestD = Infinity;
+      for (let i = 0; i < CANDY_CELLS.length; i++) {
+        if (used.has(i)) continue;
+        const d = Math.hypot(CANDY_CELLS[i][0] - cur[0], CANDY_CELLS[i][1] - cur[1]);
+        if (d < bestD) { bestD = d; best = i; }
+      }
+      if (best < 0) break;
+      used.add(best);
+      order.push(best);
+      cur = CANDY_CELLS[best];
+    }
+    return order;
   }
 
   start() {
@@ -141,7 +161,7 @@ export class Demo {
     // 接近出口：交给游戏判定
     const ex = this.world.exitInfo;
     const distExit = Math.hypot(this.player.position.x - ex.x, this.player.position.z - ex.z);
-    const allCandies = game.candiesCollected >= 8;
+    const allCandies = game.candiesCollected >= TOTAL_CANDIES;
     if (allCandies && distExit < 2.6) {
       this.reachedExit = true;
       this.player.bot.forward = 0;
@@ -204,8 +224,8 @@ export class Demo {
     this.sprintTimer = Math.max(0, this.sprintTimer - dt);
     this.player.bot.sprint = this.sprintTimer > 0 && this.player.stamina > 6;
 
-    // 第 4 片后的一次回头：展示奶蛙
-    if (!this.lookbackDone && game.candiesCollected >= 4) {
+    // 收集到约 1/6 时的一次回头：展示奶蛙
+    if (!this.lookbackDone && game.candiesCollected >= Math.max(2, Math.round(TOTAL_CANDIES / 6))) {
       this.lookbackDone = true;
       this.lookbackTimer = 1.7;
     }

@@ -22,6 +22,14 @@ export class Story {
     this.safePath = this.buildSafePath(this.curve);
     this.duration = 32;
     this.elapsed = 0;
+    // 机位朝向改成自己算 yaw/pitch，不再用 lookAt。
+    // lookAt 在「看点几乎在正下方」时会退化：实测片头 3 个回折点上俯仰瞬跳到 -77°/-88°、
+    // 方位角单帧跳 170-178°，看起来就是镜头猛地上下翻转。改成限速转向后是平滑的转身。
+    this.yaw = 0;
+    this.camPitch = -0.1;
+    this.turnRate = 2.0;      // rad/s，180° 大约 1.6 秒转过来
+    this.lookAhead = 3.0;     // 前视距离（米）。太短会让镜头几乎盯着脚下一米的地面
+    this.pitchBias = -0.26;   // 略微俯视
     this.skipped = false;
     this.playing = false;
     this.lookTmp = new THREE.Vector3();
@@ -219,10 +227,41 @@ export class Story {
     const p = this.sampleAt(0);
     this.lastSafe.copy(p);
     this.camera.position.copy(p);
-    const ahead = this.sampleAt(0.03);
-    this.camera.lookAt(ahead.x, ahead.y - 0.5, ahead.z);
+    const target = this.lookTarget(p, 0);
+    this.yaw = Math.atan2(-(target.x - p.x), -(target.z - p.z));
+    const horiz = Math.max(0.3, Math.hypot(target.x - p.x, target.z - p.z));
+    this.camPitch = Math.max(-0.42, Math.min(0.2, Math.atan2(target.y - p.y, horiz)));
+    this.camera.rotation.order = 'YXZ';
+    this.camera.rotation.set(this.camPitch, this.yaw, 0);
     this.camera.fov = 62;
     this.camera.updateProjectionMatrix();
+  }
+
+  // 从当前位置沿路径往前找一个"横向够远"的点当看点。
+  // 关键：跳过重复点（safePath 在受阻处会重复压同一个点），
+  // 否则回折点上 pos 与 ahead 几乎重合，方向退化成一味向下，lookAt 就会翻转。
+  lookTarget(pos, t) {
+    const n = this.safePath.length - 1;
+    const start = Math.max(0, Math.min(n, Math.floor(t * n)));
+    const out = new THREE.Vector3();
+    let hit = -1;
+    for (let j = start + 1; j <= n; j++) {
+      const q = this.safePath[j];
+      if (Math.hypot(q.x - pos.x, q.z - pos.z) >= this.lookAhead) { hit = j; break; }
+    }
+    if (hit >= 0) {
+      out.copy(this.safePath[hit]);
+    } else {
+      // 已经走到尽头：沿最后一段的反方向往前看
+      let k = n;
+      while (k > 0 && Math.hypot(this.safePath[k].x - pos.x, this.safePath[k].z - pos.z) < 0.25) k--;
+      const dir = new THREE.Vector3(pos.x - this.safePath[k].x, 0, pos.z - this.safePath[k].z);
+      if (dir.lengthSq() < 1e-6) dir.set(-Math.sin(this.yaw), 0, -Math.cos(this.yaw));
+      dir.normalize();
+      out.set(pos.x + dir.x * this.lookAhead, this.eyeY, pos.z + dir.z * this.lookAhead);
+    }
+    out.y = this.eyeY + this.pitchBias;   // 略微俯视，别盯着天花板
+    return out;
   }
 
   async play() {
@@ -266,7 +305,6 @@ export class Story {
     const p = Math.min(1, this.elapsed / this.duration);
     this.ui.setStoryProgress(p);
     const pos = this.sampleAt(p);
-    const ahead = this.sampleAt(Math.min(1, p + 0.032));
     const sway = Math.sin(this.elapsed * 0.8) * 0.08;
     // 兜底：万一插值仍落在墙里，就停在最后一个安全位置，绝不穿墙
     if (this.isBlocked(pos)) {
@@ -275,7 +313,27 @@ export class Story {
       this.lastSafe.copy(pos);
       this.camera.position.set(pos.x + sway * 0.6, pos.y + Math.sin(this.elapsed * 1.3) * 0.03, pos.z);
     }
-    this.camera.lookAt(ahead.x, ahead.y - 0.68 + sway, ahead.z);
-    this.camera.rotation.z += Math.sin(this.elapsed * 0.6) * 0.004;
+
+    // 朝向：先取前视点，再限速转过去。全程不调用 lookAt，避免它在视线接近垂直时翻转。
+    const camPos = this.camera.position;
+    const target = this.lookTarget(camPos, p);
+    const dx = target.x - camPos.x, dz = target.z - camPos.z;
+    const horiz = Math.hypot(dx, dz);
+    const desiredYaw = Math.atan2(-dx, -dz);
+    const desiredPitch = Math.max(-0.42, Math.min(0.2,
+      Math.atan2(target.y - camPos.y, Math.max(0.3, horiz))));
+
+    let dYaw = ((desiredYaw - this.yaw + Math.PI) % (Math.PI * 2) + Math.PI * 2) % (Math.PI * 2) - Math.PI;
+    const damp = 1 - Math.exp(-6 * dt);
+    let step = dYaw * damp;
+    const maxStep = this.turnRate * dt;
+    if (Math.abs(step) > maxStep) step = Math.sign(step) * maxStep;
+    this.yaw += step;
+    this.yaw = ((this.yaw + Math.PI) % (Math.PI * 2) + Math.PI * 2) % (Math.PI * 2) - Math.PI;
+
+    const pDamp = 1 - Math.exp(-3.5 * dt);
+    this.camPitch += (desiredPitch - this.camPitch) * pDamp;
+
+    this.camera.rotation.set(this.camPitch, this.yaw, Math.sin(this.elapsed * 0.6) * 0.004);
   }
 }

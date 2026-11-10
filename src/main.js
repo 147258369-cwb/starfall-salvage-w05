@@ -697,7 +697,7 @@ class Game {
     const secs = Math.floor(this.playTime % 60).toString().padStart(2, '0');
     this.ui.showWin([
       { value: mins + ':' + secs, label: '存活时间' },
-      { value: this.candiesCollected + ' / 8', label: '奶片' },
+      { value: this.candiesCollected + ' / ' + TOTAL_CANDIES, label: '奶片' },
       { value: String(this.scares), label: '惊险时刻' },
     ]);
     this.ui.fadeIn(1200);
