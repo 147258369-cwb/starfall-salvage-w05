@@ -164,6 +164,14 @@ python tools/package_submission.py
 - 自动化验收为 Microsoft Edge (Chromium) headless + Playwright Core，三档分辨率；Chrome / Edge 桌面版预期可用，Firefox / Safari 未测。验收用 SwiftShader 软件渲染，只覆盖「能运行、无报错、流程可走通」。
 - 内部通道扫描为几何近似，复合道具需显式标 `userData.channelFloatOk` 才不误报。
 
+**发布与部署**
+
+- GitHub Pages 为 Linux 静态托管、**不运行任何后端**；本游戏无服务端逻辑，可部署到 Pages，但任何需要服务器或接口的能力都无法在 Pages 上运行。
+- 页面经 CDN 缓存，仓库更新后线上需**数分钟**才生效；验证前应先确认部署已完成，必要时强制刷新。
+- 首屏加载约 **9.3 MB 音频**（27 条 WAV），弱网或低配设备下加载较慢；本项目仅面向桌面键鼠，未做移动端适配。
+- 仅「部署成功」或「自动化验收通过」**不代表游戏可玩**：自动化只覆盖「能运行、无报错、流程可走通」，开始 / 操作 / 进度 / 重启 / 声音与免登录打开仍需真人验证。
+- 公开分发前需确认 `frog_voice_1` 人声授权，并处理随 manifest 预加载的 `assets/audio/nai_long.mp3`（约 0.56 MB，游戏内未播放）。
+
 ---
 
 ## 5. 源代码、资源与 AI 致谢
